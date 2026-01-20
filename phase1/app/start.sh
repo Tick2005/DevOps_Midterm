@@ -76,9 +76,7 @@ echo "⚙️  Configuration:"
 echo "   Port: $PORT"
 echo "   Data Source: MongoDB Atlas (Cloud Database)"
 if [ -n "$MONGODB_URI" ] && [[ $MONGODB_URI == mongodb+srv://* ]] && [[ $MONGODB_URI != *"<username>"* ]]; then
-    # Hide password in display
-    SAFE_URI=$(echo "$MONGODB_URI" | sed 's|://[^:]*:[^@]*@|://***:***@|')
-    echo "   MongoDB: $SAFE_URI"
+    echo "   MongoDB URI: $MONGODB_URI"
 fi
 echo ""
 
@@ -213,13 +211,12 @@ MONGODB_URI_VALID=false
 if [ -n "$MONGODB_URI" ] && [[ $MONGODB_URI == mongodb+srv://* ]] && [[ $MONGODB_URI != *"<username>"* ]] && [[ $MONGODB_URI != *"<password>"* ]] && [[ $MONGODB_URI != *"<cluster>"* ]]; then
     # URI looks valid
     echo -e "${GREEN}✓ MongoDB Atlas URI already configured${NC}"
-    
-    # Hide password in display
-    SAFE_URI=$(echo "$MONGODB_URI" | sed 's|://[^:]*:[^@]*@|://***:***@|')
-    echo "   URI: $SAFE_URI"
+    echo "   Full URI: $MONGODB_URI"
     echo ""
-    echo -e "${BLUE}💡 Tip: Make sure to whitelist your IP address in MongoDB Atlas${NC}"
-    echo "   Network Access > Add IP Address > Allow Access from Anywhere (0.0.0.0/0)"
+    echo -e "${YELLOW}⚠️  If connection fails, check these on MongoDB Atlas:${NC}"
+    echo "   1. Network Access: Whitelist your IP (0.0.0.0/0 for all IPs)"
+    echo "   2. Database User: Verify username and password are correct"
+    echo "   3. Cluster Name: Make sure it matches exactly (e.g., cluster0.ahaubn2)"
     echo ""
     
     MONGODB_URI_VALID=true
@@ -298,10 +295,18 @@ else
         MONGODB_URI="mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_CLUSTER}.mongodb.net/${MONGO_DATABASE}?retryWrites=true&w=majority"
         
         echo -e "${GREEN}✓ MongoDB Atlas connection string created${NC}"
-        
-        # Hide password in display
-        SAFE_URI=$(echo "$MONGODB_URI" | sed 's|://[^:]*:[^@]*@|://***:***@|')
-        echo "   URI: $SAFE_URI"
+        echo ""
+        echo -e "${CYAN}Please verify your connection details:${NC}"
+        echo "   Username: $MONGO_USERNAME"
+        echo "   Password: $MONGO_PASSWORD"
+        echo "   Cluster:  $MONGO_CLUSTER.mongodb.net"
+        echo "   Database: $MONGO_DATABASE"
+        echo "   Full URI: $MONGODB_URI"
+        echo ""
+        echo -e "${YELLOW}⚠️  Important: Make sure you have completed these steps on MongoDB Atlas:${NC}"
+        echo "   1. Database User exists with correct password"
+        echo "   2. Network Access allows your IP (recommend: 0.0.0.0/0 for testing)"
+        echo "   3. Cluster name is correct (including the subdomain like 'cluster0.ahaubn2')"
         echo ""
         
         # Confirm with user
@@ -412,9 +417,8 @@ echo -e "${BLUE}📋 Final Configuration:${NC}"
 echo "   Port:        $PORT"
 echo "   Data Source: $DATA_SOURCE"
 if [ "$DATA_SOURCE" == "mongodb" ]; then
-    SAFE_URI=$(echo "$MONGODB_URI" | sed 's|://[^:]*:[^@]*@|://***:***@|')
     echo "   MongoDB:     MongoDB Atlas (Cloud)"
-    echo "   URI:         $SAFE_URI"
+    echo "   URI:         $MONGODB_URI"
 fi
 echo ""
 
