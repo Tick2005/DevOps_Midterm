@@ -75,7 +75,7 @@ echo ""
 echo "⚙️  Configuration:"
 echo "   Port: $PORT"
 echo "   Data Source: MongoDB Atlas (Cloud Database)"
-if [ -n "$MONGODB_URI" ] && [[ $MONGODB_URI != mongodb+srv://* ]] && [[ $MONGODB_URI != *"<username>"* ]]; then
+if [ -n "$MONGODB_URI" ] && [[ $MONGODB_URI == mongodb+srv://* ]] && [[ $MONGODB_URI != *"<username>"* ]]; then
     # Hide password in display
     SAFE_URI=$(echo "$MONGODB_URI" | sed 's|://[^:]*:[^@]*@|://***:***@|')
     echo "   MongoDB: $SAFE_URI"
@@ -380,18 +380,18 @@ else
     echo -e "${GREEN}✓ Uploads directory exists${NC}"
 fi
 
-# Install npm dependenMongoDB Atlas (Cloud Database)"
-SAFE_URI=$(echo "$MONGODB_URI" | sed 's|://[^:]*:[^@]*@|://***:***@|')
-echo "   MongoDB URI: $SAFE_URI"  npm install --silent
+# Install npm dependencies
+if [ ! -d "node_modules" ]; then
+    echo -n "Installing dependencies... "
+    npm install --silent
     
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✓ Dependencies installed successfully${NC}"
-    else
+    if [ $? -ne 0 ]; then
         echo -e "${RED}❌ Failed to install dependencies${NC}"
         exit 1
     fi
+    echo -e "${GREEN}✓ Dependencies installed successfully${NC}"
 else
-    echo -e "${GREEN}✓ Already installed${NC}"
+    echo -e "${GREEN}✓ Dependencies already installed${NC}"
 fi
 
 echo ""
