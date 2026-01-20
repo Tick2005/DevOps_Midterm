@@ -31,13 +31,13 @@ async function start() {
   }
 
   // Try to connect to MongoDB once with 3s timeout
-  const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/products_db';
+  const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/products_db';
   let usingMongo = false;
   try {
     await mongoose.connect(mongoUri, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 3000
+      serverSelectionTimeoutMS: 10000
     });
     usingMongo = true;
     console.log('Connected to MongoDB — using mongodb as data source.');
