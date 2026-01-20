@@ -207,110 +207,138 @@ echo ""
 echo -e "${CYAN}This application requires MongoDB Atlas (Cloud Database)${NC}"
 echo ""
 
-# Check if MONGODB_URI is set and valid
+# Check if MONGODB_URI is already configured and valid
 MONGODB_URI_VALID=false
 
-while [ "$MONGODB_URI_VALID" = false ]; do
-    # Check if URI is configured and not a template
-    if [ -n "$MONGODB_URI" ] && [[ $MONGODB_URI == mongodb+srv://* ]] && [[ $MONGODB_URI != *"<username>"* ]] && [[ $MONGODB_URI != *"<password>"* ]] && [[ $MONGODB_URI != *"<cluster>"* ]]; then
-        # URI looks valid
-        echo -e "${GREEN}✓ MongoDB Atlas URI configured${NC}"
+if [ -n "$MONGODB_URI" ] && [[ $MONGODB_URI == mongodb+srv://* ]] && [[ $MONGODB_URI != *"<username>"* ]] && [[ $MONGODB_URI != *"<password>"* ]] && [[ $MONGODB_URI != *"<cluster>"* ]]; then
+    # URI looks valid
+    echo -e "${GREEN}✓ MongoDB Atlas URI already configured${NC}"
+    
+    # Hide password in display
+    SAFE_URI=$(echo "$MONGODB_URI" | sed 's|://[^:]*:[^@]*@|://***:***@|')
+    echo "   URI: $SAFE_URI"
+    echo ""
+    echo -e "${BLUE}💡 Tip: Make sure to whitelist your IP address in MongoDB Atlas${NC}"
+    echo "   Network Access > Add IP Address > Allow Access from Anywhere (0.0.0.0/0)"
+    echo ""
+    
+    MONGODB_URI_VALID=true
+fi
+
+# If not configured, ask user for credentials
+if [ "$MONGODB_URI_VALID" = false ]; then
+    echo -e "${YELLOW}⚠ MongoDB Atlas credentials required${NC}"
+    echo ""
+    echo -e "${BLUE}📝 How to get MongoDB Atlas credentials:${NC}"
+    echo "   1. Go to https://www.mongodb.com/cloud/atlas"
+    echo "   2. Sign up/Login (Free tier M0 available - 512MB)"
+    echo "   3. Create a cluster (Choose M0 Free tier)"
+    echo "   4. Create Database User:"
+    echo "      - Go to: Database Access > Add New Database User"
+    echo "      - Set username and password"
+    echo "      - Grant 'Read and write to any database' permission"
+    echo "   5. Whitelist IP:"
+    echo "      - Go to: Network Access > Add IP Address"
+    echo "      - Choose: Allow Access from Anywhere (0.0.0.0/0)"
+    echo "   6. Get cluster name:"
+    echo "      - Go to: Database > Clusters"
+    echo "      - Your cluster name (e.g., cluster0, cluster1)"
+    echo ""
+    
+    # Loop until valid credentials are provided
+    while [ "$MONGODB_URI_VALID" = false ]; do
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${CYAN}Enter MongoDB Atlas Credentials:${NC}"
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        
+        # Ask for username
+        read -p "MongoDB Username: " MONGO_USERNAME
+        
+        if [ -z "$MONGO_USERNAME" ]; then
+            echo ""
+            echo -e "${RED}❌ Username cannot be empty${NC}"
+            echo ""
+            read -p "Press Enter to try again..." -r
+            echo ""
+            continue
+        fi
+        
+        # Ask for password (hidden input)
+        echo -e "${YELLOW}(Password will be hidden for security)${NC}"
+        read -rsp "MongoDB Password: " MONGO_PASSWORD
+        echo ""
+        
+        if [ -z "$MONGO_PASSWORD" ]; then
+            echo ""
+            echo -e "${RED}❌ Password cannot be empty${NC}"
+            echo ""
+            read -p "Press Enter to try again..." -r
+            echo ""
+            continue
+        fi
+        
+        # Ask for cluster name
+        read -p "Cluster Name (e.g., cluster0): " MONGO_CLUSTER
+        
+        if [ -z "$MONGO_CLUSTER" ]; then
+            echo ""
+            echo -e "${RED}❌ Cluster name cannot be empty${NC}"
+            echo ""
+            read -p "Press Enter to try again..." -r
+            echo ""
+            continue
+        fi
+        
+        # Ask for database name (default: productdb)
+        read -p "Database Name [productdb]: " MONGO_DATABASE
+        MONGO_DATABASE=${MONGO_DATABASE:-productdb}
+        
+        echo ""
+        
+        # Build MongoDB Atlas connection string
+        MONGODB_URI="mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_CLUSTER}.mongodb.net/${MONGO_DATABASE}?retryWrites=true&w=majority"
+        
+        echo -e "${GREEN}✓ MongoDB Atlas connection string created${NC}"
         
         # Hide password in display
         SAFE_URI=$(echo "$MONGODB_URI" | sed 's|://[^:]*:[^@]*@|://***:***@|')
         echo "   URI: $SAFE_URI"
         echo ""
-        echo -e "${BLUE}💡 Tip: Make sure to whitelist your IP address in MongoDB Atlas${NC}"
-        echo "   Network Access > Add IP Address > Allow Access from Anywhere (0.0.0.0/0)"
+        
+        # Confirm with user
+        read -p "Is this information correct? (y/n): " -n 1 -r
         echo ""
         
-        MONGODB_URI_VALID=true
-    else
-        # URI not configured or invalid
-        if [ -n "$MONGODB_URI" ] && [[ $MONGODB_URI != *"<username>"* ]]; then
-            echo -e "${RED}❌ Invalid MongoDB Atlas connection string format${NC}"
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            # Save to .env file
+            if grep -q "^MONGODB_URI=" "$ENV_FILE" 2>/dev/null; then
+                sed -i "s|^MONGODB_URI=.*|MONGODB_URI=$MONGODB_URI|" "$ENV_FILE" 2>/dev/null || \
+                sed -i '' "s|^MONGODB_URI=.*|MONGODB_URI=$MONGODB_URI|" "$ENV_FILE" 2>/dev/null
+            else
+                echo "MONGODB_URI=$MONGODB_URI" >> "$ENV_FILE"
+            fi
+            
+            # Update DATA_SOURCE to mongodb
+            if grep -q "^DATA_SOURCE=" "$ENV_FILE" 2>/dev/null; then
+                sed -i "s|^DATA_SOURCE=.*|DATA_SOURCE=mongodb|" "$ENV_FILE" 2>/dev/null || \
+                sed -i '' "s|^DATA_SOURCE=.*|DATA_SOURCE=mongodb|" "$ENV_FILE" 2>/dev/null
+            else
+                echo "DATA_SOURCE=mongodb" >> "$ENV_FILE"
+            fi
+            
             echo ""
-        fi
-        
-        echo -e "${YELLOW}⚠ MongoDB Atlas connection string is required${NC}"
-        echo ""
-        echo -e "${BLUE}📝 How to get MongoDB Atlas connection string:${NC}"
-        echo "   1. Go to https://www.mongodb.com/cloud/atlas"
-        echo "   2. Sign up/Login (Free tier M0 available - 512MB)"
-        echo "   3. Create a new cluster (Choose M0 Free tier)"
-        echo "   4. Create a Database User (Database Access > Add New User)"
-        echo "   5. Whitelist IP (Network Access > Add IP > 0.0.0.0/0 for all)"
-        echo "   6. Get Connection String:"
-        echo "      - Click 'Connect' on your cluster"
-        echo "      - Choose 'Connect your application'"
-        echo "      - Copy the connection string"
-        echo "      - Replace <password> with your actual password"
-        echo "      - Replace <dbname> with 'productdb' (or your database name)"
-        echo ""
-        echo -e "${YELLOW}Required format:${NC}"
-        echo "   mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/productdb"
-        echo ""
-        echo -e "${YELLOW}Example:${NC}"
-        echo "   mongodb+srv://myuser:MyP@ssw0rd@cluster0.mongodb.net/productdb"
-        echo ""
-        
-        echo -e "${CYAN}Please enter your MongoDB Atlas connection string:${NC}"
-        read -r ATLAS_URI
-        
-        # Validate URI format
-        if [ -z "$ATLAS_URI" ]; then
+            echo -e "${GREEN}✓ MongoDB Atlas credentials saved to .env${NC}"
             echo ""
-            echo -e "${RED}❌ Connection string cannot be empty${NC}"
-            echo ""
-            read -p "Press Enter to try again..." -r
-            echo ""
-            continue
-        fi
-        
-        if [[ $ATLAS_URI != mongodb+srv://* ]] && [[ $ATLAS_URI != mongodb://* ]]; then
-            echo ""
-            echo -e "${RED}❌ Invalid format. Must start with 'mongodb+srv://' or 'mongodb://'${NC}"
-            echo ""
-            read -p "Press Enter to try again..." -r
-            echo ""
-            continue
-        fi
-        
-        if [[ $ATLAS_URI == *"<username>"* ]] || [[ $ATLAS_URI == *"<password>"* ]] || [[ $ATLAS_URI == *"<cluster>"* ]]; then
-            echo ""
-            echo -e "${RED}❌ Please replace placeholders (<username>, <password>, <cluster>) with actual values${NC}"
-            echo ""
-            read -p "Press Enter to try again..." -r
-            echo ""
-            continue
-        fi
-        
-        # URI is valid, save it
-        MONGODB_URI="$ATLAS_URI"
-        
-        # Update .env file
-        if grep -q "^MONGODB_URI=" "$ENV_FILE" 2>/dev/null; then
-            sed -i "s|^MONGODB_URI=.*|MONGODB_URI=$ATLAS_URI|" "$ENV_FILE" 2>/dev/null || \
-            sed -i '' "s|^MONGODB_URI=.*|MONGODB_URI=$ATLAS_URI|" "$ENV_FILE" 2>/dev/null
+            
+            MONGODB_URI_VALID=true
         else
-            echo "MONGODB_URI=$ATLAS_URI" >> "$ENV_FILE"
+            echo ""
+            echo -e "${YELLOW}Let's try again...${NC}"
+            echo ""
         fi
-        
-        # Update DATA_SOURCE to mongodb
-        if grep -q "^DATA_SOURCE=" "$ENV_FILE" 2>/dev/null; then
-            sed -i "s|^DATA_SOURCE=.*|DATA_SOURCE=mongodb|" "$ENV_FILE" 2>/dev/null || \
-            sed -i '' "s|^DATA_SOURCE=.*|DATA_SOURCE=mongodb|" "$ENV_FILE" 2>/dev/null
-        else
-            echo "DATA_SOURCE=mongodb" >> "$ENV_FILE"
-        fi
-        
-        echo ""
-        echo -e "${GREEN}✓ MongoDB Atlas URI saved to .env${NC}"
-        echo ""
-        
-        MONGODB_URI_VALID=true
-    fi
-done
+    done
+fi
 
 echo -e "${GREEN}✅ MongoDB Atlas configured successfully!${NC}"
 echo ""
