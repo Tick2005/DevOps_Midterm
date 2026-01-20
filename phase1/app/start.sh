@@ -223,10 +223,8 @@ if [ -n "$MONGODB_URI" ] && [[ $MONGODB_URI == mongodb+srv://* ]] && [[ $MONGODB
     echo ""
     
     MONGODB_URI_VALID=true
-fi
-
-# If not configured, ask user for credentials
-if [ "$MONGODB_URI_VALID" = false ]; then
+else
+    # If not configured, ask user for credentials
     echo -e "${YELLOW}⚠ MongoDB Atlas credentials required${NC}"
     echo ""
     echo -e "${BLUE}📝 How to get MongoDB Atlas credentials:${NC}"
