@@ -1,268 +1,415 @@
 #!/bin/bash
-# ========================================
-# Automation Script - Complete Setup & Start
-# ========================================
 
-echo "========================================"
-echo "  Application Auto Setup & Start"
-echo "========================================"
+# ============================================
+# SETUP & START AUTOMATION SCRIPT
+# ============================================
+# This script installs dependencies, configures database,
+# and starts the Node.js application
+# For Product Management System Deployment
+
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_ROOT="$SCRIPT_DIR"
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🚀 PRODUCT MANAGEMENT SYSTEM - AUTO SETUP"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "📍 Application root: $APP_ROOT"
 echo ""
 
-# Function to install Node.js
-install_nodejs() {
-    echo "[INFO] Installing Node.js..."
-    
-    # Check if running on Ubuntu/Debian
-    if command -v apt-get &> /dev/null; then
-        # Install Node.js 20.x LTS
-        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-        sudo apt-get install -y nodejs
-        
-        if [ $? -eq 0 ]; then
-            echo "[OK] Node.js installed successfully"
-            node --version
-            npm --version
-            return 0
-        else
-            echo "[ERROR] Failed to install Node.js"
-            return 1
-        fi
-    else
-        echo "[ERROR] Automatic installation only supported on Ubuntu/Debian"
-        echo "[INFO] Please install Node.js manually from: https://nodejs.org/"
-        return 1
-    fi
-}
-
-# Function to install MongoDB
-install_mongodb() {
-    echo "[INFO] Installing MongoDB Community Edition 7.0..."
-    
-    # Install prerequisites
-    sudo apt-get install -y gnupg curl wget
-    
-    # Import MongoDB GPG key
-    curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | \
-        sudo gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
-    
-    # Detect Ubuntu version and add repository
-    if [ -f /etc/os-release ]; then
-        . /etc/os-release
-        if [[ "$VERSION_ID" =~ ^(22\.04|23\.|24\.) ]]; then
-            UBUNTU_CODENAME="jammy"
-        else
-            UBUNTU_CODENAME="focal"
-        fi
-    else
-        UBUNTU_CODENAME="jammy"
-    fi
-    
-    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu $UBUNTU_CODENAME/mongodb-org/7.0 multiverse" | \
-        sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
-    
-    # Update and install MongoDB
-    sudo apt-get update
-    sudo apt-get install -y mongodb-org
-    
-    if [ $? -eq 0 ]; then
-        echo "[OK] MongoDB installed successfully"
-        
-        # Start and enable MongoDB
-        sudo systemctl start mongod
-        sudo systemctl enable mongod
-        echo "[OK] MongoDB service started and enabled"
-        return 0
-    else
-        echo "[ERROR] Failed to install MongoDB"
-        return 1
-    fi
-}
-
-# Check if Node.js is installed
-if ! command -v node &> /dev/null; then
-    echo "[WARNING] Node.js is not installed"
-    read -p "Do you want to install Node.js automatically? (y/n): " -n 1 -r
-    echo ""
-    
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        install_nodejs
-        if [ $? -ne 0 ]; then
-            exit 1
-        fi
-    else
-        echo "[ERROR] Node.js is required to run this application"
-        exit 1
-    fi
-else
-    echo "[OK] Node.js is installed"
-    node --version
-fi
-echo ""
-
-# Check if npm is installed
-if ! command -v npm &> /dev/null; then
-    echo "[ERROR] npm is not installed"
-    echo "[INFO] npm should come with Node.js. Please reinstall Node.js"
+# Navigate to app root
+if [ ! -d "$APP_ROOT" ]; then
+    echo "❌ Error: App root not found at $APP_ROOT"
     exit 1
 fi
 
-echo "[OK] npm is installed"
-npm --version
+cd "$APP_ROOT"
+echo "✓ Working directory: $(pwd)"
 echo ""
 
-# Check if node_modules exists
-if [ ! -d "node_modules" ]; then
-    echo "[INFO] node_modules not found. Installing dependencies..."
-    npm install
-    if [ $? -ne 0 ]; then
-        echo "[ERROR] Failed to install dependencies"
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# ============================================
+# LOAD ENVIRONMENT VARIABLES FROM .env
+# ============================================
+
+ENV_FILE="$APP_ROOT/.env"
+
+if [ -f "$ENV_FILE" ]; then
+    echo "📄 Loading environment variables from .env..."
+    set -a
+    source "$ENV_FILE"
+    set +a
+    echo -e "${GREEN}✓ Environment variables loaded${NC}"
+else
+    echo -e "${YELLOW}⚠ .env file not found. Creating from template...${NC}"
+    
+    # Check if .env.example exists
+    if [ ! -f "$APP_ROOT/.env.example" ]; then
+        echo -e "${RED}❌ Error: .env.example not found${NC}"
         exit 1
     fi
-    echo "[OK] Dependencies installed successfully"
-    echo ""
-else
-    echo "[OK] Dependencies already installed"
-    echo ""
+    
+    cp "$APP_ROOT/.env.example" "$ENV_FILE"
+    echo -e "${GREEN}✓ Created .env file from template${NC}"
+    
+    # Load the new .env file
+    set -a
+    source "$ENV_FILE"
+    set +a
 fi
 
-# Check and install MongoDB
-MONGODB_INSTALLED=false
-MONGODB_RUNNING=false
+# Set defaults if not in .env
+PORT="${PORT:-3000}"
+DATA_SOURCE="mongodb"  # Always use MongoDB Atlas
+MONGODB_URI="${MONGODB_URI:-}"
 
-if command -v mongod &> /dev/null; then
-    MONGODB_INSTALLED=true
-    echo "[OK] MongoDB is installed"
+echo ""
+echo "⚙️  Configuration:"
+echo "   Port: $PORT"
+echo "   Data Source: MongoDB Atlas (Cloud Database)"
+if [ -n "$MONGODB_URI" ] && [[ $MONGODB_URI != mongodb+srv://* ]] && [[ $MONGODB_URI != *"<username>"* ]]; then
+    # Hide password in display
+    SAFE_URI=$(echo "$MONGODB_URI" | sed 's|://[^:]*:[^@]*@|://***:***@|')
+    echo "   MongoDB: $SAFE_URI"
+fi
+echo ""
+
+# ============================================
+# STEP 1: CHECK AND INSTALL PREREQUISITES
+# ============================================
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📦 STEP 1: Installing Dependencies"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Detect OS
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    OS="linux"
+    if [ -f /etc/debian_version ]; then
+        PKG_MANAGER="apt"
+    elif [ -f /etc/redhat-release ]; then
+        PKG_MANAGER="yum"
+    fi
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    OS="mac"
+    PKG_MANAGER="brew"
+else
+    echo -e "${RED}❌ Unsupported OS: $OSTYPE${NC}"
+    exit 1
+fi
+
+echo "Detected OS: $OS (Package manager: $PKG_MANAGER)"
+echo ""
+
+# Function to install packages
+install_package() {
+    local package=$1
     
-    # Check if MongoDB is running
-    if systemctl is-active --quiet mongod 2>/dev/null || pgrep -x mongod > /dev/null 2>&1; then
-        MONGODB_RUNNING=true
-        echo "[OK] MongoDB is running"
+    # Check if already installed
+    if command -v "$package" &> /dev/null 2>&1 || dpkg -s "$package" &> /dev/null 2>&1; then
+        echo -e "${GREEN}✓ $package is already installed${NC}"
+        return 0
+    fi
+    
+    echo "Installing $package..."
+    
+    if [ "$PKG_MANAGER" == "apt" ]; then
+        sudo apt update -qq && sudo apt install -y "$package"
+    elif [ "$PKG_MANAGER" == "yum" ]; then
+        sudo yum install -y "$package"
+    elif [ "$PKG_MANAGER" == "brew" ]; then
+        brew install "$package"
+    fi
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ $package installed successfully${NC}"
+        return 0
     else
-        echo "[WARNING] MongoDB is installed but not running"
-        echo "[INFO] Starting MongoDB..."
+        echo -e "${RED}❌ Failed to install $package${NC}"
+        return 1
+    fi
+}
+
+# Install Basic Tools
+echo -n "Checking curl... "
+install_package "curl"
+
+echo -n "Checking git... "
+install_package "git"
+
+# Check Node.js
+echo -n "Checking Node.js... "
+NODE_INSTALLED=false
+
+if command -v node &> /dev/null; then
+    NODE_VERSION=$(node -v)
+    echo -e "${GREEN}✓ Found ($NODE_VERSION)${NC}"
+    NODE_INSTALLED=true
+else
+    echo -e "${YELLOW}✗ Not found${NC}"
+fi
+
+# Install Node.js if not present
+if [ "$NODE_INSTALLED" = false ]; then
+    echo "Installing Node.js 20.x LTS..."
+    if [ "$PKG_MANAGER" == "apt" ]; then
+        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+        install_package "nodejs"
+    elif [ "$PKG_MANAGER" == "yum" ]; then
+        curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+        install_package "nodejs"
+    elif [ "$PKG_MANAGER" == "brew" ]; then
+        install_package "node"
+    fi
+    
+    # Verify installation
+    if command -v node &> /dev/null; then
+        NODE_VERSION=$(node -v)
+        echo -e "${GREEN}✓ Node.js $NODE_VERSION installed${NC}"
+    else
+        echo -e "${RED}❌ Failed to install Node.js${NC}"
+        exit 1
+    fi
+fi
+
+# Check npm
+echo -n "Checking npm... "
+if command -v npm &> /dev/null; then
+    NPM_VERSION=$(npm -v)
+    echo -e "${GREEN}✓ Found (npm $NPM_VERSION)${NC}"
+else
+    echo -e "${RED}❌ npm not found (should come with Node.js)${NC}"
+    exit 1
+fi
+
+echo ""
+echo -e "${GREEN}✅ All dependencies verified!${NC}"
+echo ""
+
+# ============================================
+# STEP 2: MONGODB ATLAS CONFIGURATION (REQUIRED)
+# ============================================
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "☁️  STEP 2: MongoDB Atlas Configuration (Required)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+echo -e "${CYAN}This application requires MongoDB Atlas (Cloud Database)${NC}"
+echo ""
+
+# Check if MONGODB_URI is set and valid
+MONGODB_URI_VALID=false
+
+while [ "$MONGODB_URI_VALID" = false ]; do
+    # Check if URI is configured and not a template
+    if [ -n "$MONGODB_URI" ] && [[ $MONGODB_URI == mongodb+srv://* ]] && [[ $MONGODB_URI != *"<username>"* ]] && [[ $MONGODB_URI != *"<password>"* ]] && [[ $MONGODB_URI != *"<cluster>"* ]]; then
+        # URI looks valid
+        echo -e "${GREEN}✓ MongoDB Atlas URI configured${NC}"
         
-        if command -v systemctl &> /dev/null; then
-            sudo systemctl start mongod 2>/dev/null
-            if [ $? -eq 0 ]; then
-                echo "[OK] MongoDB started successfully"
-                MONGODB_RUNNING=true
-            else
-                echo "[ERROR] Failed to start MongoDB"
-            fi
+        # Hide password in display
+        SAFE_URI=$(echo "$MONGODB_URI" | sed 's|://[^:]*:[^@]*@|://***:***@|')
+        echo "   URI: $SAFE_URI"
+        echo ""
+        echo -e "${BLUE}💡 Tip: Make sure to whitelist your IP address in MongoDB Atlas${NC}"
+        echo "   Network Access > Add IP Address > Allow Access from Anywhere (0.0.0.0/0)"
+        echo ""
+        
+        MONGODB_URI_VALID=true
+    else
+        # URI not configured or invalid
+        if [ -n "$MONGODB_URI" ] && [[ $MONGODB_URI != *"<username>"* ]]; then
+            echo -e "${RED}❌ Invalid MongoDB Atlas connection string format${NC}"
+            echo ""
         fi
-    fi
-else
-    echo "[WARNING] MongoDB is not installed"
-    read -p "Do you want to install MongoDB automatically? (y/n): " -n 1 -r
-    echo ""
-    
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        install_mongodb
-        if [ $? -eq 0 ]; then
-            MONGODB_INSTALLED=true
-            MONGODB_RUNNING=true
+        
+        echo -e "${YELLOW}⚠ MongoDB Atlas connection string is required${NC}"
+        echo ""
+        echo -e "${BLUE}📝 How to get MongoDB Atlas connection string:${NC}"
+        echo "   1. Go to https://www.mongodb.com/cloud/atlas"
+        echo "   2. Sign up/Login (Free tier M0 available - 512MB)"
+        echo "   3. Create a new cluster (Choose M0 Free tier)"
+        echo "   4. Create a Database User (Database Access > Add New User)"
+        echo "   5. Whitelist IP (Network Access > Add IP > 0.0.0.0/0 for all)"
+        echo "   6. Get Connection String:"
+        echo "      - Click 'Connect' on your cluster"
+        echo "      - Choose 'Connect your application'"
+        echo "      - Copy the connection string"
+        echo "      - Replace <password> with your actual password"
+        echo "      - Replace <dbname> with 'productdb' (or your database name)"
+        echo ""
+        echo -e "${YELLOW}Required format:${NC}"
+        echo "   mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/productdb"
+        echo ""
+        echo -e "${YELLOW}Example:${NC}"
+        echo "   mongodb+srv://myuser:MyP@ssw0rd@cluster0.mongodb.net/productdb"
+        echo ""
+        
+        echo -e "${CYAN}Please enter your MongoDB Atlas connection string:${NC}"
+        read -r ATLAS_URI
+        
+        # Validate URI format
+        if [ -z "$ATLAS_URI" ]; then
+            echo ""
+            echo -e "${RED}❌ Connection string cannot be empty${NC}"
+            echo ""
+            read -p "Press Enter to try again..." -r
+            echo ""
+            continue
+        fi
+        
+        if [[ $ATLAS_URI != mongodb+srv://* ]] && [[ $ATLAS_URI != mongodb://* ]]; then
+            echo ""
+            echo -e "${RED}❌ Invalid format. Must start with 'mongodb+srv://' or 'mongodb://'${NC}"
+            echo ""
+            read -p "Press Enter to try again..." -r
+            echo ""
+            continue
+        fi
+        
+        if [[ $ATLAS_URI == *"<username>"* ]] || [[ $ATLAS_URI == *"<password>"* ]] || [[ $ATLAS_URI == *"<cluster>"* ]]; then
+            echo ""
+            echo -e "${RED}❌ Please replace placeholders (<username>, <password>, <cluster>) with actual values${NC}"
+            echo ""
+            read -p "Press Enter to try again..." -r
+            echo ""
+            continue
+        fi
+        
+        # URI is valid, save it
+        MONGODB_URI="$ATLAS_URI"
+        
+        # Update .env file
+        if grep -q "^MONGODB_URI=" "$ENV_FILE" 2>/dev/null; then
+            sed -i "s|^MONGODB_URI=.*|MONGODB_URI=$ATLAS_URI|" "$ENV_FILE" 2>/dev/null || \
+            sed -i '' "s|^MONGODB_URI=.*|MONGODB_URI=$ATLAS_URI|" "$ENV_FILE" 2>/dev/null
         else
-            echo "[WARNING] Failed to install MongoDB, will use file-based storage"
+            echo "MONGODB_URI=$ATLAS_URI" >> "$ENV_FILE"
         fi
-    else
-        echo "[INFO] Skipping MongoDB installation"
+        
+        # Update DATA_SOURCE to mongodb
+        if grep -q "^DATA_SOURCE=" "$ENV_FILE" 2>/dev/null; then
+            sed -i "s|^DATA_SOURCE=.*|DATA_SOURCE=mongodb|" "$ENV_FILE" 2>/dev/null || \
+            sed -i '' "s|^DATA_SOURCE=.*|DATA_SOURCE=mongodb|" "$ENV_FILE" 2>/dev/null
+        else
+            echo "DATA_SOURCE=mongodb" >> "$ENV_FILE"
+        fi
+        
+        echo ""
+        echo -e "${GREEN}✓ MongoDB Atlas URI saved to .env${NC}"
+        echo ""
+        
+        MONGODB_URI_VALID=true
     fi
-fi
+done
+
+echo -e "${GREEN}✅ MongoDB Atlas configured successfully!${NC}"
 echo ""
 
-# Create .env.example if it doesn't exist
-if [ ! -f ".env.example" ]; then
-    echo "[INFO] Creating .env.example file..."
-    cat > .env.example << 'EOF'
-# Application Configuration Example
-# Copy this file to .env and modify as needed
+# ============================================
+# STEP 3: APPLICATION CONFIGURATION
+# ============================================
 
-# Server Port
-PORT=3000
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "⚙️  STEP 3: Application Configuration"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
 
-# MongoDB Configuration
-MONGODB_URI=mongodb://localhost:27017/productdb
-
-# Data Source: 'file' or 'mongodb'
-# Use 'mongodb' for production, 'file' for development without MongoDB
-DATA_SOURCE=mongodb
-
-# Node Environment
-NODE_ENV=development
+# Create .gitignore if not exists
+if [ ! -f ".gitignore" ]; then
+    echo -n "Creating .gitignore... "
+    cat > .gitignore << 'EOF'
+.env
+node_modules/
+public/uploads/*
+!public/uploads/.gitkeep
+*.log
+.DS_Store
 EOF
-    echo "[OK] .env.example created"
-fi
-
-# Configure .env file
-if [ ! -f ".env" ]; then
-    echo "[INFO] Creating .env file from template..."
-    
-    # Set DATA_SOURCE based on MongoDB availability
-    if [ "$MONGODB_RUNNING" = true ]; then
-        DATA_SOURCE_VALUE="mongodb"
-        echo "[INFO] Configuring application to use MongoDB"
-    else
-        DATA_SOURCE_VALUE="file"
-        echo "[INFO] Configuring application to use file-based storage"
-    fi
-    
-    cat > .env << EOF
-PORT=3000
-MONGODB_URI=mongodb://localhost:27017/productdb
-DATA_SOURCE=$DATA_SOURCE_VALUE
-NODE_ENV=development
-EOF
-    echo "[OK] .env file created (DATA_SOURCE=$DATA_SOURCE_VALUE)"
+    echo -e "${GREEN}✓${NC}"
+elif ! grep -q "^\.env$" .gitignore 2>/dev/null; then
+    echo -n "Adding .env to .gitignore... "
+    echo ".env" >> .gitignore
+    echo -e "${GREEN}✓${NC}"
 else
-    echo "[OK] .env file already exists"
-    
-    # Update DATA_SOURCE if MongoDB status changed
-    if [ "$MONGODB_RUNNING" = true ]; then
-        if ! grep -q "DATA_SOURCE=mongodb" .env 2>/dev/null; then
-            echo "[INFO] Updating .env to use MongoDB..."
-            sed -i 's/DATA_SOURCE=.*/DATA_SOURCE=mongodb/' .env 2>/dev/null || \
-            sed -i '' 's/DATA_SOURCE=.*/DATA_SOURCE=mongodb/' .env 2>/dev/null
-        fi
-    fi
-fi
-echo ""
-
-# Add .env to .gitignore if not already there
-if [ -f ".gitignore" ]; then
-    if ! grep -q "^\.env$" .gitignore 2>/dev/null; then
-        echo ".env" >> .gitignore
-        echo "[OK] Added .env to .gitignore"
-    fi
-elif [ ! -f ".gitignore" ]; then
-    echo ".env" > .gitignore
-    echo "node_modules/" >> .gitignore
-    echo "public/uploads/*" >> .gitignore
-    echo "!public/uploads/.gitkeep" >> .gitignore
-    echo "[OK] Created .gitignore file"
+    echo -e "${GREEN}✓ .gitignore configured${NC}"
 fi
 
-# Crea"
-echo "========================================"
-echo "  Starting Application"
-echo "========================================"
-echo ""
-echo "Configuration:"
-echo "  - Port: $(grep PORT .env | cut -d '=' -f2)"
-echo "  - Data Source: $(grep DATA_SOURCE .env | cut -d '=' -f2)"
-if [ "$MONGODB_RUNNING" = true ]; then
-    echo "  - MongoDB: Running on localhost:27017"
-fi
-echo ""
-echo "Application will be available at: http://localhost:$(grep PORT .env | cut -d '=' -f2 | tr -d '[:space:]')sn't exist
+# Create uploads directory
 if [ ! -d "public/uploads" ]; then
-    echo "[INFO] Creating uploads directory..."
+    echo -n "Creating uploads directory... "
     mkdir -p "public/uploads"
-    echo "[OK] Uploads directory created"
-    echo ""
+    touch "public/uploads/.gitkeep"
+    echo -e "${GREEN}✓${NC}"
+else
+    echo -e "${GREEN}✓ Uploads directory exists${NC}"
 fi
 
-echo "[INFO] Starting application..."
-echo "========================================"
+# Install npm dependenMongoDB Atlas (Cloud Database)"
+SAFE_URI=$(echo "$MONGODB_URI" | sed 's|://[^:]*:[^@]*@|://***:***@|')
+echo "   MongoDB URI: $SAFE_URI"  npm install --silent
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Dependencies installed successfully${NC}"
+    else
+        echo -e "${RED}❌ Failed to install dependencies${NC}"
+        exit 1
+    fi
+else
+    echo -e "${GREEN}✓ Already installed${NC}"
+fi
+
+echo ""
+echo -e "${GREEN}✅ Application configured!${NC}"
+echo ""
+
+# ============================================
+# STEP 4: START APPLICATION
+# ============================================
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🚀 STEP 4: Starting Application"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Display final configuration
+echo -e "${BLUE}📋 Final Configuration:${NC}"
+echo "   Port:        $PORT"
+echo "   Data Source: $DATA_SOURCE"
+if [ "$DATA_SOURCE" == "mongodb" ]; then
+    SAFE_URI=$(echo "$MONGODB_URI" | sed 's|://[^:]*:[^@]*@|://***:***@|')
+    echo "   MongoDB:     MongoDB Atlas (Cloud)"
+    echo "   URI:         $SAFE_URI"
+fi
+echo ""
+
+# Get server IP
+if command -v curl &> /dev/null; then
+    SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || echo "localhost")
+else
+    SERVER_IP="localhost"
+fi
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo -e "${GREEN}✅ SETUP COMPLETED!${NC}"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo -e "${BLUE}🌐 Access your application at:${NC}"
+echo "   Local:  http://localhost:$PORT"
+if [ "$SERVER_IP" != "localhost" ]; then
+    echo "   Remote: http://$SERVER_IP:$PORT"
+fi
+echo ""
+echo -e "${GREEN}✨ Starting application...${NC}"
 echo ""
 
 # Start the application
