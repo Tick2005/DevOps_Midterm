@@ -30,20 +30,29 @@ async function start() {
     console.log(`Created uploads directory at ${uploadsDir}`);
   }
 
-  // Try to connect to MongoDB once with 3s timeout
-  const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/products_db';
+  // Try to connect to MongoDB Atlas with extended timeout (30 seconds)
+  const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/products_db';
   let usingMongo = false;
+  
+  console.log('Attempting to connect to MongoDB Atlas...');
+  console.log('Using URI:', mongoUri.replace(/:[^:@]+@/, ':***@')); // Hide password in log
+  
   try {
     await mongoose.connect(mongoUri, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 10000
+      serverSelectionTimeoutMS: 30000,  // 30 seconds for Atlas cloud connection
+      connectTimeoutMS: 30000,           // 30 seconds to establish connection
+      socketTimeoutMS: 45000,            // 45 seconds for socket operations
+      family: 4                          // Force IPv4 (sometimes IPv6 causes issues)
     });
     usingMongo = true;
-    console.log('Connected to MongoDB — using mongodb as data source.');
+    console.log('✓ Successfully connected to MongoDB Atlas — using mongodb as data source.');
   } catch (err) {
     usingMongo = false;
-    console.log('Failed to connect to MongoDB within 3s — falling back to in-memory database.');
+    console.log('✗ Failed to connect to MongoDB Atlas — falling back to in-memory database.');
+    console.log('Connection error:', err.message);
+    console.log('Reason:', err.reason?.message || 'Unknown');
   }
 
   await dataSource.init(usingMongo);
