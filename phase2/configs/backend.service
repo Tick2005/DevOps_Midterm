@@ -1,0 +1,34 @@
+[Unit]
+Description=Product Management Node.js Application
+Documentation=https://github.com/yourrepo/product-management
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/DevOps_Midterm/phase1/app
+ExecStart=/usr/bin/node /home/ubuntu/DevOps_Midterm/phase1/app/main.js
+
+# Auto restart on failure
+Restart=always
+RestartSec=10
+
+# Environment variables
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOST=0.0.0.0
+
+# Load additional variables from .env file
+EnvironmentFile=/home/ubuntu/DevOps_Midterm/phase1/app/.env
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=product-app
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
