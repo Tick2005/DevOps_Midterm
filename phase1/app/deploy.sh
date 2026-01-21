@@ -109,29 +109,156 @@ fi
 
 ENV_FILE="$APP_ROOT/.env"
 
+# ============================================
+# FUNCTION: CREATE .ENV FILE INTERACTIVELY
+# ============================================
+create_env_file() {
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo -e "${CYAN}📝 Environment Configuration${NC}"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo -e "${BLUE}We need to set up your environment variables.${NC}"
+    echo ""
+    
+    # MongoDB Atlas credentials
+    echo -e "${YELLOW}MongoDB Atlas Setup:${NC}"
+    echo "If you don't have MongoDB Atlas yet:"
+    echo "  1. Visit: https://www.mongodb.com/cloud/atlas"
+    echo "  2. Create free cluster (M0 tier - 512MB free)"
+    echo "  3. Create database user"
+    echo "  4. Whitelist IP: 0.0.0.0/0 (Network Access)"
+    echo ""
+    
+    # Get MongoDB username
+    read -p "MongoDB Username: " MONGO_USERNAME
+    while [ -z "$MONGO_USERNAME" ]; do
+        echo -e "${RED}Username cannot be empty!${NC}"
+        read -p "MongoDB Username: " MONGO_USERNAME
+    done
+    
+    # Get MongoDB password (hidden)
+    echo -e "${YELLOW}(Password will be hidden)${NC}"
+    read -rsp "MongoDB Password: " MONGO_PASSWORD
+    echo ""
+    while [ -z "$MONGO_PASSWORD" ]; do
+        echo -e "${RED}Password cannot be empty!${NC}"
+        read -rsp "MongoDB Password: " MONGO_PASSWORD
+        echo ""
+    done
+    
+    # Get cluster name
+    read -p "Cluster Name (e.g., cluster0): " MONGO_CLUSTER
+    while [ -z "$MONGO_CLUSTER" ]; do
+        echo -e "${RED}Cluster name cannot be empty!${NC}"
+        read -p "Cluster Name: " MONGO_CLUSTER
+    done
+    
+    # Get database name
+    read -p "Database Name [productdb]: " MONGO_DATABASE
+    MONGO_DATABASE=${MONGO_DATABASE:-productdb}
+    
+    # Build MongoDB URI
+    MONGODB_URI="mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_CLUSTER}.mongodb.net/${MONGO_DATABASE}?retryWrites=true&w=majority"
+    
+    echo ""
+    echo -e "${CYAN}Configuration Summary:${NC}"
+    echo "  Username: $MONGO_USERNAME"
+    echo "  Cluster:  $MONGO_CLUSTER.mongodb.net"
+    echo "  Database: $MONGO_DATABASE"
+    echo ""
+    
+    # Get application port
+    read -p "Application Port [3000]: " APP_PORT
+    APP_PORT=${APP_PORT:-3000}
+    
+    # Get host binding
+    if [ "$MODE" == "production" ]; then
+        APP_HOST="0.0.0.0"
+        APP_ENV="production"
+    else
+        read -p "Host [0.0.0.0]: " APP_HOST
+        APP_HOST=${APP_HOST:-0.0.0.0}
+        APP_ENV="development"
+    fi
+    
+    echo ""
+    echo -e "${GREEN}Creating .env file...${NC}"
+    
+    # Create .env file
+    cat > "$ENV_FILE" << EOF
+# MongoDB Atlas Configuration
+MONGODB_URI=$MONGODB_URI
+MONGO_URI=$MONGODB_URI
+DATA_SOURCE=mongodb
+
+# Application Settings
+PORT=$APP_PORT
+HOST=$APP_HOST
+NODE_ENV=$APP_ENV
+
+# Optional: Add more variables below as needed
+# MAX_FILE_SIZE=10485760
+EOF
+    
+    chmod 600 "$ENV_FILE"  # Secure file permissions
+    echo -e "${GREEN}✓ .env file created successfully${NC}"
+    echo -e "${GREEN}✓ File permissions set to 600 (owner read/write only)${NC}"
+    echo ""
+    
+    # Reload environment variables
+    set -a
+    source "$ENV_FILE"
+    set +a
+}
+
+# ============================================
+# LOAD OR CREATE .ENV FILE
+# ============================================
+
 if [ -f "$ENV_FILE" ]; then
     echo "📄 Loading environment variables from .env..."
     set -a
     source "$ENV_FILE"
     set +a
     echo -e "${GREEN}✓ Environment variables loaded${NC}"
+    
+    # Validate required variables for production
+    if [ "$MODE" == "production" ]; then
+        if [ -z "$MONGODB_URI" ] || [[ $MONGODB_URI == *"username"* ]] || [[ $MONGODB_URI == *"password"* ]]; then
+            echo -e "${YELLOW}⚠ .env file exists but MongoDB URI is not configured properly${NC}"
+            read -p "Do you want to reconfigure? (y/n): " -n 1 -r
+            echo ""
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                create_env_file
+            else
+                echo -e "${RED}❌ Valid MongoDB URI required for production mode${NC}"
+                exit 1
+            fi
+        fi
+    fi
 else
     echo -e "${YELLOW}⚠ .env file not found.${NC}"
     
     if [ "$MODE" == "production" ]; then
-        echo -e "${RED}❌ Production mode requires .env file${NC}"
-        echo ""
-        echo "Create .env file with:"
-        echo "  MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/dbname"
-        echo "  PORT=3000"
-        echo "  NODE_ENV=production"
-        echo "  HOST=0.0.0.0"
-        exit 1
+        echo -e "${YELLOW}Production mode requires environment configuration.${NC}"
+        create_env_file
     else
         echo "Creating .env for development..."
         if [ -f "$APP_ROOT/.env.example" ]; then
             cp "$APP_ROOT/.env.example" "$ENV_FILE"
             echo -e "${GREEN}✓ Created .env from template${NC}"
+            
+            # Still prompt for MongoDB if needed
+            set -a
+            source "$ENV_FILE"
+            set +a
+            
+            if [ -z "$MONGODB_URI" ] || [[ $MONGODB_URI == *"<username>"* ]]; then
+                create_env_file
+            fi
+        else
+            create_env_file
         fi
     fi
 fi
@@ -216,58 +343,37 @@ echo -e "${GREEN}✅ All dependencies installed!${NC}"
 echo ""
 
 # ============================================
-# STEP 2: MONGODB ATLAS CONFIGURATION
+# STEP 2: VERIFY MONGODB CONFIGURATION
 # ============================================
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo -e "${CYAN}☁️  STEP 2: MongoDB Atlas Configuration${NC}"
+echo -e "${CYAN}☁️  STEP 2: Verify MongoDB Configuration${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-MONGODB_URI_VALID=false
-
+# Check if MongoDB URI is valid
 if [ -n "$MONGODB_URI" ] && [[ $MONGODB_URI == mongodb+srv://* ]] && [[ $MONGODB_URI != *"<username>"* ]]; then
-    echo -e "${GREEN}✓ MongoDB Atlas URI already configured${NC}"
-    MONGODB_URI_VALID=true
+    echo -e "${GREEN}✓ MongoDB Atlas URI configured${NC}"
+    # Hide password in display
+    DISPLAY_URI=$(echo "$MONGODB_URI" | sed 's/:\/\/[^:]*:[^@]*@/:\/\/***:***@/')
+    echo "   URI: $DISPLAY_URI"
+    echo ""
+    echo -e "${YELLOW}⚠️  Important MongoDB Atlas Checklist:${NC}"
+    echo "   1. Database User exists with correct password"
+    echo "   2. Network Access: IP whitelist includes your IP or 0.0.0.0/0"
+    echo "   3. Cluster name is correct (including subdomain)"
+    echo ""
 else
-    echo -e "${YELLOW}⚠ MongoDB Atlas credentials required${NC}"
+    echo -e "${RED}❌ MongoDB URI not properly configured${NC}"
     echo ""
-    echo -e "${BLUE}📝 How to get MongoDB Atlas credentials:${NC}"
-    echo "   1. Go to https://www.mongodb.com/cloud/atlas"
-    echo "   2. Create free cluster (M0 tier)"
-    echo "   3. Create database user with password"
-    echo "   4. Whitelist IP: 0.0.0.0/0 (for testing)"
-    echo "   5. Get cluster connection string"
+    read -p "Do you want to reconfigure MongoDB now? (y/n): " -n 1 -r
     echo ""
-    
-    while [ "$MONGODB_URI_VALID" = false ]; do
-        read -p "MongoDB Username: " MONGO_USERNAME
-        read -rsp "MongoDB Password: " MONGO_PASSWORD
-        echo ""
-        read -p "Cluster Name (e.g., cluster0): " MONGO_CLUSTER
-        read -p "Database Name [productdb]: " MONGO_DATABASE
-        MONGO_DATABASE=${MONGO_DATABASE:-productdb}
-        
-        MONGODB_URI="mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_CLUSTER}.mongodb.net/${MONGO_DATABASE}?retryWrites=true&w=majority"
-        
-        echo ""
-        echo "MongoDB URI: $MONGODB_URI"
-        read -p "Is this correct? (y/n): " -n 1 -r
-        echo ""
-        
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            # Save to .env
-            if grep -q "^MONGODB_URI=" "$ENV_FILE" 2>/dev/null; then
-                sed -i "s|^MONGODB_URI=.*|MONGODB_URI=$MONGODB_URI|" "$ENV_FILE" 2>/dev/null || \
-                sed -i '' "s|^MONGODB_URI=.*|MONGODB_URI=$MONGODB_URI|" "$ENV_FILE" 2>/dev/null
-            else
-                echo "MONGODB_URI=$MONGODB_URI" >> "$ENV_FILE"
-            fi
-            
-            echo -e "${GREEN}✓ MongoDB credentials saved${NC}"
-            MONGODB_URI_VALID=true
-        fi
-    done
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        create_env_file
+    else
+        echo -e "${RED}❌ Cannot continue without valid MongoDB configuration${NC}"
+        exit 1
+    fi
 fi
 
 echo ""
