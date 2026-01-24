@@ -21,6 +21,7 @@ app.use('/', uiRoutes);
 app.use('/products', productRoutes);
 
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
 
 async function start() {
   // Đảm bảo thư mục uploads tồn tại
@@ -57,9 +58,10 @@ async function start() {
 
   await dataSource.init(usingMongo);
 
-  app.listen(PORT, () => {
-    console.log(`Server listening on port http://localhost:${PORT} — hostname: ${os.hostname()}`);
-    console.log(`Data source in use: ${dataSource.isMongo ? 'mongodb' : 'in-memory'}`);
+  app.listen(PORT, HOST, () => {
+    console.log(`✓ Server running on http://${HOST}:${PORT} — hostname: ${os.hostname()}`);
+    console.log(`✓ Data source in use: ${dataSource.isMongo ? 'mongodb' : 'in-memory'}`);
+    console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
   });
 }
 
