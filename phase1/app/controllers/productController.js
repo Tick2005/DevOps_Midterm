@@ -7,8 +7,27 @@ function meta() {
 
 async function list(req, res, next) {
   try {
-    const items = await dataSource.getAll();
-    res.json({ data: items, ...meta() });
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    
+    const allItems = await dataSource.getAll();
+    const total = allItems.length;
+    const items = allItems.slice(skip, skip + limit);
+    const totalPages = Math.ceil(total / limit);
+    
+    res.json({ 
+      data: items, 
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1
+      },
+      ...meta() 
+    });
   } catch (err) { next(err); }
 }
 

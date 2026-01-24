@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const modal = new bootstrap.Modal(modalEl);
 
   function openModalForAdd() {
-    document.getElementById('modalTitle').textContent = 'Add Product';
+    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-plus-circle"></i><span>Add Product</span>';
     productForm.reset();
     document.getElementById('product-id').value = '';
     document.getElementById('img-preview').src = '/images/placeholder-80.png';
@@ -14,15 +14,16 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function openModalForEdit(row) {
-    document.getElementById('modalTitle').textContent = 'Edit Product';
+    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit"></i><span>Edit Product</span>';
     const id = row.dataset.id;
     document.getElementById('product-id').value = id;
-    const cols = row.querySelectorAll('td');
-    // columns: 0=thumb,1=name,2=price,3=color,4=description
-    document.getElementById('name').value = cols[1].textContent.trim();
-    document.getElementById('price').value = cols[2].textContent.trim();
-    document.getElementById('color').value = cols[3].textContent.trim();
-    document.getElementById('description').value = cols[4].textContent.trim();
+    
+    // Get data from dataset attributes for accurate values
+    document.getElementById('name').value = row.dataset.name || '';
+    document.getElementById('price').value = row.dataset.price || '';
+    document.getElementById('color').value = row.dataset.color || '';
+    document.getElementById('description').value = row.dataset.description || '';
+    
     const existingImage = row.dataset.image || '';
     document.getElementById('img-preview').src = existingImage && existingImage.length ? existingImage : '/images/placeholder-80.png';
     document.getElementById('imageUrl').value = existingImage || '';
@@ -34,17 +35,37 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('product-table').addEventListener('click', function (e) {
     const tr = e.target.closest('tr');
     if (!tr) return;
-    if (e.target.classList.contains('btn-edit')) {
+    if (e.target.classList.contains('btn-edit') || e.target.closest('.btn-edit')) {
       openModalForEdit(tr);
-    } else if (e.target.classList.contains('btn-delete')) {
+    } else if (e.target.classList.contains('btn-delete') || e.target.closest('.btn-delete')) {
       const id = tr.dataset.id;
-      if (confirm('Delete this product?')) {
-        fetch(`/products/${id}`, { method: 'DELETE' }).then(r => {
-          if (r.ok) location.reload(); else r.json().then(j => alert(j.message || 'Delete failed'));
-        }).catch(() => alert('Delete failed'));
-      }
+      const productName = tr.dataset.name || 'this product';
+      showDeleteModal(productName, id);
     }
   });
+
+  // Show Delete Modal
+  function showDeleteModal(productName, productId) {
+    document.getElementById('delete-product-name').textContent = productName;
+    const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    deleteModal.show();
+    
+    // Set up delete confirmation
+    document.getElementById('btn-confirm-delete').onclick = function() {
+      performDelete(productId);
+      deleteModal.hide();
+    };
+  }
+
+  function performDelete(id) {
+    fetch(`/products/${id}`, { method: 'DELETE' }).then(r => {
+      if (r.ok) {
+        location.reload();
+      } else {
+        r.json().then(j => alert('❌ Error: ' + (j.message || 'Delete failed')));
+      }
+    }).catch(() => alert('❌ Error: Delete failed'));
+  }
 
   productForm.addEventListener('submit', function (e) {
     e.preventDefault();
