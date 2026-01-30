@@ -1,16 +1,13 @@
 #!/bin/bash
 
 # ============================================
-# UNIFIED DEPLOYMENT & START SCRIPT
+# PRODUCTION DEPLOYMENT SCRIPT FOR AWS UBUNTU
 # ============================================
-# This script can run in two modes:
-# 1. Development Mode: Quick start with npm (like start.sh)
-# 2. Production Mode: Full setup with systemd + nginx (like deploy-production.sh)
+# This script deploys the application in production mode
+# with PM2 process manager and Nginx reverse proxy
 #
 # Usage:
-#   ./deploy.sh              # Auto-detect mode
-#   ./deploy.sh dev          # Force development mode
-#   ./deploy.sh prod         # Force production mode
+#   ./deploy.sh              # Run production deployment
 
 set -e  # Exit on error
 
@@ -26,45 +23,12 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_ROOT="$SCRIPT_DIR"
 
-# ============================================
-# DETECT DEPLOYMENT MODE
-# ============================================
-
-# Check for command line argument
-if [ "$1" == "dev" ]; then
-    MODE="development"
-elif [ "$1" == "prod" ] || [ "$1" == "production" ]; then
-    MODE="production"
-else
-    # Auto-detect based on system
-    if [ -f "/etc/systemd/system/product-app.service" ] || [ -d "/etc/nginx" ]; then
-        MODE="production"
-    else
-        MODE="development"
-    fi
-    
-    # Ask user
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo -e "${CYAN}🚀 DEPLOYMENT MODE SELECTION${NC}"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-    echo "1) Development  - Quick start with npm (foreground)"
-    echo "2) Production   - Full setup with systemd + nginx (recommended for AWS)"
-    echo ""
-    read -p "Select mode [1/2] (default: 1): " -n 1 -r
-    echo ""
-    echo ""
-    
-    if [[ $REPLY =~ ^[2]$ ]]; then
-        MODE="production"
-    else
-        MODE="development"
-    fi
-fi
+# Set to production mode only
+MODE="production"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo -e "${CYAN}🚀 PRODUCT MANAGEMENT SYSTEM${NC}"
-echo -e "${CYAN}   Mode: ${YELLOW}${MODE^^}${NC}"
+echo -e "${CYAN}   Mode: ${YELLOW}PRODUCTION${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "📍 Application root: $APP_ROOT"
@@ -118,69 +82,40 @@ create_env_file() {
     echo -e "${CYAN}📝 Environment Configuration${NC}"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
-    echo -e "${BLUE}We need to set up your environment variables.${NC}"
+    echo -e "${BLUE}Setting up environment variables for MongoDB Atlas${NC}"
     echo ""
     
-    # MongoDB Atlas credentials
-    echo -e "${YELLOW}MongoDB Atlas Setup:${NC}"
-    echo "If you don't have MongoDB Atlas yet:"
-    echo "  1. Visit: https://www.mongodb.com/cloud/atlas"
-    echo "  2. Create free cluster (M0 tier - 512MB free)"
-    echo "  3. Create database user"
-    echo "  4. Whitelist IP: 0.0.0.0/0 (Network Access)"
+    # Get MongoDB password
+    echo -e "${YELLOW}MongoDB Atlas Configuration:${NC}"
+    echo "Base URI: mongodb+srv://admin:<db_password>@cluster0.ahaubn2.mongodb.net/"
+    echo "Database: productdb (fixed)"
     echo ""
     
-    # Get MongoDB username
-    read -p "MongoDB Username: " MONGO_USERNAME
-    while [ -z "$MONGO_USERNAME" ]; do
-        echo -e "${RED}Username cannot be empty!${NC}"
-        read -p "MongoDB Username: " MONGO_USERNAME
-    done
-    
-    # Get MongoDB password (hidden)
-    echo -e "${YELLOW}(Password will be hidden)${NC}"
-    read -rsp "MongoDB Password: " MONGO_PASSWORD
+    read -rsp "Enter MongoDB Password: " MONGO_PASSWORD
     echo ""
     while [ -z "$MONGO_PASSWORD" ]; do
         echo -e "${RED}Password cannot be empty!${NC}"
-        read -rsp "MongoDB Password: " MONGO_PASSWORD
+        read -rsp "Enter MongoDB Password: " MONGO_PASSWORD
         echo ""
     done
     
-    # Get cluster name
-    read -p "Cluster Name (e.g., cluster0): " MONGO_CLUSTER
-    while [ -z "$MONGO_CLUSTER" ]; do
-        echo -e "${RED}Cluster name cannot be empty!${NC}"
-        read -p "Cluster Name: " MONGO_CLUSTER
-    done
-    
-    # Get database name
-    read -p "Database Name [productdb]: " MONGO_DATABASE
-    MONGO_DATABASE=${MONGO_DATABASE:-productdb}
-    
-    # Build MongoDB URI
-    MONGODB_URI="mongodb+srv://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_CLUSTER}.mongodb.net/${MONGO_DATABASE}?retryWrites=true&w=majority"
+    # Build MongoDB URI with fixed values
+    MONGODB_URI="mongodb+srv://admin:${MONGO_PASSWORD}@cluster0.ahaubn2.mongodb.net/productdb?retryWrites=true&w=majority"
     
     echo ""
     echo -e "${CYAN}Configuration Summary:${NC}"
-    echo "  Username: $MONGO_USERNAME"
-    echo "  Cluster:  $MONGO_CLUSTER.mongodb.net"
-    echo "  Database: $MONGO_DATABASE"
+    echo "  Username: admin"
+    echo "  Cluster:  cluster0.ahaubn2.mongodb.net"
+    echo "  Database: productdb"
     echo ""
     
     # Get application port
     read -p "Application Port [3000]: " APP_PORT
     APP_PORT=${APP_PORT:-3000}
     
-    # Get host binding
-    if [ "$MODE" == "production" ]; then
-        APP_HOST="0.0.0.0"
-        APP_ENV="production"
-    else
-        read -p "Host [0.0.0.0]: " APP_HOST
-        APP_HOST=${APP_HOST:-0.0.0.0}
-        APP_ENV="development"
-    fi
+    # Production defaults
+    APP_HOST="0.0.0.0"
+    APP_ENV="production"
     
     echo ""
     echo -e "${GREEN}Creating .env file...${NC}"
@@ -213,6 +148,98 @@ EOF
 }
 
 # ============================================
+# FUNCTION: UPDATE EXISTING .ENV FILE
+# ============================================
+update_env_file() {
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo -e "${CYAN}📝 Update Environment Configuration${NC}"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo -e "${BLUE}Current values will be kept if you just press Enter${NC}"
+    echo ""
+    
+    # Load current values
+    set -a
+    source "$ENV_FILE"
+    set +a
+    
+    # Extract current password from URI if possible
+    CURRENT_PASSWORD=""
+    if [[ $MONGODB_URI =~ admin:([^@]+)@ ]]; then
+        CURRENT_PASSWORD="${BASH_REMATCH[1]}"
+    fi
+    
+    # Update MongoDB password
+    echo -e "${YELLOW}MongoDB Configuration:${NC}"
+    echo "Base URI: mongodb+srv://admin:<db_password>@cluster0.ahaubn2.mongodb.net/"
+    echo "Database: productdb (fixed)"
+    echo ""
+    
+    if [ -n "$CURRENT_PASSWORD" ]; then
+        echo "Current password: ${CURRENT_PASSWORD:0:3}***"
+    fi
+    read -rsp "New MongoDB Password (Enter to keep current): " NEW_PASSWORD
+    echo ""
+    
+    if [ -n "$NEW_PASSWORD" ]; then
+        MONGO_PASSWORD="$NEW_PASSWORD"
+        echo -e "${GREEN}✓ Password will be updated${NC}"
+    else
+        MONGO_PASSWORD="$CURRENT_PASSWORD"
+        echo -e "${BLUE}✓ Keeping current password${NC}"
+    fi
+    
+    # Build MongoDB URI
+    MONGODB_URI="mongodb+srv://admin:${MONGO_PASSWORD}@cluster0.ahaubn2.mongodb.net/productdb?retryWrites=true&w=majority"
+    
+    # Update application port
+    echo ""
+    echo "Current port: ${PORT:-3000}"
+    read -p "New Application Port (Enter to keep current): " NEW_PORT
+    
+    if [ -n "$NEW_PORT" ]; then
+        APP_PORT="$NEW_PORT"
+        echo -e "${GREEN}✓ Port will be updated to $APP_PORT${NC}"
+    else
+        APP_PORT="${PORT:-3000}"
+        echo -e "${BLUE}✓ Keeping current port $APP_PORT${NC}"
+    fi
+    
+    # Production defaults
+    APP_HOST="0.0.0.0"
+    APP_ENV="production"
+    
+    echo ""
+    echo -e "${GREEN}Updating .env file...${NC}"
+    
+    # Update .env file
+    cat > "$ENV_FILE" << EOF
+# MongoDB Atlas Configuration
+MONGODB_URI=$MONGODB_URI
+MONGO_URI=$MONGODB_URI
+DATA_SOURCE=mongodb
+
+# Application Settings
+PORT=$APP_PORT
+HOST=$APP_HOST
+NODE_ENV=$APP_ENV
+
+# Optional: Add more variables below as needed
+# MAX_FILE_SIZE=10485760
+EOF
+    
+    chmod 600 "$ENV_FILE"
+    echo -e "${GREEN}✓ .env file updated successfully${NC}"
+    echo ""
+    
+    # Reload environment variables
+    set -a
+    source "$ENV_FILE"
+    set +a
+}
+
+# ============================================
 # LOAD OR CREATE .ENV FILE
 # ============================================
 
@@ -222,45 +249,22 @@ if [ -f "$ENV_FILE" ]; then
     source "$ENV_FILE"
     set +a
     echo -e "${GREEN}✓ Environment variables loaded${NC}"
+    echo ""
     
-    # Validate required variables for production
-    if [ "$MODE" == "production" ]; then
-        if [ -z "$MONGODB_URI" ] || [[ $MONGODB_URI == *"username"* ]] || [[ $MONGODB_URI == *"password"* ]]; then
-            echo -e "${YELLOW}⚠ .env file exists but MongoDB URI is not configured properly${NC}"
-            read -p "Do you want to reconfigure? (y/n): " -n 1 -r
-            echo ""
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                create_env_file
-            else
-                echo -e "${RED}❌ Valid MongoDB URI required for production mode${NC}"
-                exit 1
-            fi
-        fi
+    # Ask if user wants to update configuration
+    read -p "Do you want to update the .env configuration? (y/n): " -n 1 -r
+    echo ""
+    echo ""
+    
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        update_env_file
+    else
+        echo -e "${BLUE}✓ Using existing configuration${NC}"
     fi
 else
     echo -e "${YELLOW}⚠ .env file not found.${NC}"
-    
-    if [ "$MODE" == "production" ]; then
-        echo -e "${YELLOW}Production mode requires environment configuration.${NC}"
-        create_env_file
-    else
-        echo "Creating .env for development..."
-        if [ -f "$APP_ROOT/.env.example" ]; then
-            cp "$APP_ROOT/.env.example" "$ENV_FILE"
-            echo -e "${GREEN}✓ Created .env from template${NC}"
-            
-            # Still prompt for MongoDB if needed
-            set -a
-            source "$ENV_FILE"
-            set +a
-            
-            if [ -z "$MONGODB_URI" ] || [[ $MONGODB_URI == *"<username>"* ]]; then
-                create_env_file
-            fi
-        else
-            create_env_file
-        fi
-    fi
+    echo -e "${YELLOW}Creating new environment configuration...${NC}"
+    create_env_file
 fi
 
 # Set defaults
@@ -329,13 +333,20 @@ else
 fi
 
 # Install nginx for production mode
-if [ "$MODE" == "production" ]; then
-    if ! command -v nginx &> /dev/null; then
-        echo "Installing nginx..."
-        install_package "nginx"
-    else
-        echo -e "${GREEN}✓ Nginx already installed${NC}"
-    fi
+if ! command -v nginx &> /dev/null; then
+    echo "Installing nginx..."
+    install_package "nginx"
+else
+    echo -e "${GREEN}✓ Nginx already installed${NC}"
+fi
+
+# Install PM2 globally for production mode
+if ! command -v pm2 &> /dev/null; then
+    echo "Installing PM2 process manager..."
+    $SUDO npm install -g pm2
+    echo -e "${GREEN}✓ PM2 installed successfully${NC}"
+else
+    echo -e "${GREEN}✓ PM2 already installed${NC}"
 fi
 
 echo ""
@@ -343,37 +354,24 @@ echo -e "${GREEN}✅ All dependencies installed!${NC}"
 echo ""
 
 # ============================================
-# STEP 2: VERIFY MONGODB CONFIGURATION
+# STEP 2: MONGODB CONFIGURATION
 # ============================================
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo -e "${CYAN}☁️  STEP 2: Verify MongoDB Configuration${NC}"
+echo -e "${CYAN}☁️  STEP 2: MongoDB Configuration${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# Check if MongoDB URI is valid
-if [ -n "$MONGODB_URI" ] && [[ $MONGODB_URI == mongodb+srv://* ]] && [[ $MONGODB_URI != *"<username>"* ]]; then
+# Display MongoDB configuration (without verification)
+if [ -n "$MONGODB_URI" ]; then
     echo -e "${GREEN}✓ MongoDB Atlas URI configured${NC}"
     # Hide password in display
     DISPLAY_URI=$(echo "$MONGODB_URI" | sed 's/:\/\/[^:]*:[^@]*@/:\/\/***:***@/')
     echo "   URI: $DISPLAY_URI"
-    echo ""
-    echo -e "${YELLOW}⚠️  Important MongoDB Atlas Checklist:${NC}"
-    echo "   1. Database User exists with correct password"
-    echo "   2. Network Access: IP whitelist includes your IP or 0.0.0.0/0"
-    echo "   3. Cluster name is correct (including subdomain)"
-    echo ""
 else
-    echo -e "${RED}❌ MongoDB URI not properly configured${NC}"
-    echo ""
-    read -p "Do you want to reconfigure MongoDB now? (y/n): " -n 1 -r
-    echo ""
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        create_env_file
-    else
-        echo -e "${RED}❌ Cannot continue without valid MongoDB configuration${NC}"
-        exit 1
-    fi
+    echo -e "${RED}❌ MongoDB URI not configured${NC}"
+    echo "Please run the script again and configure MongoDB properly."
+    exit 1
 fi
 
 echo ""
@@ -410,11 +408,7 @@ fi
 # Install npm dependencies
 if [ ! -d "node_modules" ]; then
     echo "Installing npm packages..."
-    if [ "$MODE" == "production" ]; then
-        npm install --production
-    else
-        npm install
-    fi
+    npm install --production
     echo -e "${GREEN}✓ Dependencies installed${NC}"
 else
     echo -e "${GREEN}✓ Dependencies already installed${NC}"
@@ -423,120 +417,54 @@ fi
 echo ""
 
 # ============================================
-# MODE-SPECIFIC DEPLOYMENT
+# PRODUCTION MODE - PM2 + NGINX
 # ============================================
 
-if [ "$MODE" == "development" ]; then
-    # ============================================
-    # DEVELOPMENT MODE - START WITH NPM
-    # ============================================
-    
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo -e "${CYAN}🚀 Starting Application (Development Mode)${NC}"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-    
-    # Get server IP
-    if command -v curl &> /dev/null; then
-        SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || echo "localhost")
-    else
-        SERVER_IP="localhost"
-    fi
-    
-    echo -e "${BLUE}📋 Configuration:${NC}"
-    echo "   Port:        $PORT"
-    echo "   Data Source: MongoDB Atlas"
-    echo ""
-    
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo -e "${GREEN}✅ SETUP COMPLETED!${NC}"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-    echo -e "${BLUE}🌐 Access your application at:${NC}"
-    echo "   Local:  http://localhost:$PORT"
-    if [ "$SERVER_IP" != "localhost" ]; then
-        echo "   Remote: http://$SERVER_IP:$PORT"
-        echo ""
-        echo -e "${YELLOW}⚠️  Note: For remote access, ensure port $PORT is open in Security Group${NC}"
-    fi
-    echo ""
-    echo -e "${GREEN}✨ Starting application...${NC}"
-    echo ""
-    
-    # Start the application
-    npm start
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo -e "${CYAN}🔧 Production Deployment${NC}"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
 
-else
-    # ============================================
-    # PRODUCTION MODE - SYSTEMD + NGINX
-    # ============================================
-    
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo -e "${CYAN}🔧 Production Deployment${NC}"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-    
-    # Create configs directory if doesn't exist
-    CONFIGS_DIR="$SCRIPT_DIR/configs"
-    if [ ! -d "$CONFIGS_DIR" ]; then
-        mkdir -p "$CONFIGS_DIR"
-        echo -e "${GREEN}✓ Created configs directory${NC}"
-    fi
-    
-    # ============================================
-    # CREATE SYSTEMD SERVICE FILE
-    # ============================================
-    
-    echo "Setting up systemd service..."
-    
-    cat > "$CONFIGS_DIR/product-app.service" << EOF
-[Unit]
-Description=Product Management Node.js Application
-Documentation=https://github.com/yourrepo/product-management
-After=network.target
+# ============================================
+# CREATE PM2 ECOSYSTEM FILE
+# ============================================
 
-[Service]
-Type=simple
-User=$USER
-WorkingDirectory=$APP_ROOT
-ExecStart=$(which node) $APP_ROOT/main.js
+echo "Setting up PM2 configuration..."
 
-# Auto restart on failure
-Restart=always
-RestartSec=10
-
-# Environment variables
-Environment=NODE_ENV=production
-Environment=PORT=3000
-Environment=HOST=0.0.0.0
-
-# Load additional variables from .env file
-EnvironmentFile=$APP_ROOT/.env
-
-# Logging
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=product-app
-
-# Security hardening
-NoNewPrivileges=true
-PrivateTmp=true
-
-[Install]
-WantedBy=multi-user.target
+cat > "ecosystem.config.js" << EOF
+module.exports = {
+  apps: [{
+    name: 'product-app',
+    script: './main.js',
+    instances: 1,
+    autorestart: true,
+    watch: false,
+    max_memory_restart: '1G',
+    env: {
+      NODE_ENV: 'production',
+      PORT: ${PORT:-3000},
+      HOST: '0.0.0.0'
+    },
+    error_file: './logs/pm2-error.log',
+    out_file: './logs/pm2-out.log',
+    log_file: './logs/pm2-combined.log',
+    time: true
+  }]
+};
 EOF
-    
-    # Copy to systemd
-    $SUDO cp "$CONFIGS_DIR/product-app.service" /etc/systemd/system/product-app.service
-    echo -e "${GREEN}✓ Systemd service created${NC}"
-    
-    # ============================================
-    # CREATE NGINX CONFIGURATION
-    # ============================================
-    
-    echo "Setting up nginx configuration..."
-    
-    cat > "$CONFIGS_DIR/nginx.conf" << EOF
+
+# Create logs directory
+mkdir -p logs
+
+echo -e "${GREEN}✓ PM2 ecosystem file created${NC}"
+
+# ============================================
+# CREATE NGINX CONFIGURATION
+# ============================================
+
+echo "Setting up nginx configuration..."
+
+cat > "nginx.conf" << EOF
 server {
     listen 80;
     listen [::]:80;
@@ -551,7 +479,7 @@ server {
 
     # Main application - Reverse proxy to Node.js
     location / {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://localhost:${PORT:-3000};
         proxy_http_version 1.1;
         
         # WebSocket support
@@ -589,7 +517,7 @@ server {
 
     # Static assets caching
     location ~* \.(css|js|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot)\$ {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://localhost:${PORT:-3000};
         expires 1y;
         add_header Cache-Control "public, immutable";
     }
@@ -603,94 +531,112 @@ server {
     server_tokens off;
 }
 EOF
-    
-    # Copy to nginx
-    $SUDO cp "$CONFIGS_DIR/nginx.conf" /etc/nginx/sites-available/product-app
-    
-    # Remove default site
-    if [ -f /etc/nginx/sites-enabled/default ]; then
-        $SUDO rm /etc/nginx/sites-enabled/default
-    fi
-    
-    # Enable site
-    $SUDO ln -sf /etc/nginx/sites-available/product-app /etc/nginx/sites-enabled/product-app
-    
-    echo -e "${GREEN}✓ Nginx configuration created${NC}"
-    
-    # ============================================
-    # START SERVICES
-    # ============================================
-    
-    echo ""
-    echo "Starting services..."
-    
-    # Test nginx config
-    if $SUDO nginx -t; then
-        echo -e "${GREEN}✓ Nginx configuration valid${NC}"
-    else
-        echo -e "${RED}❌ Nginx configuration test failed${NC}"
-        exit 1
-    fi
-    
-    # Reload systemd
-    $SUDO systemctl daemon-reload
-    
-    # Enable and start app service
-    $SUDO systemctl enable product-app
-    $SUDO systemctl restart product-app
-    
-    # Restart nginx
-    $SUDO systemctl restart nginx
-    
-    echo -e "${GREEN}✓ Services started${NC}"
-    
-    # Check service status
-    sleep 2
-    if $SUDO systemctl is-active --quiet product-app; then
-        echo -e "${GREEN}✓ Application service is running${NC}"
-    else
-        echo -e "${RED}❌ Service failed to start. Check: sudo journalctl -u product-app -n 50${NC}"
-        exit 1
-    fi
-    
-    if $SUDO systemctl is-active --quiet nginx; then
-        echo -e "${GREEN}✓ Nginx service is running${NC}"
-    else
-        echo -e "${RED}❌ Nginx failed to start${NC}"
-        exit 1
-    fi
-    
-    echo ""
-    
-    # ============================================
-    # PRODUCTION DEPLOYMENT SUMMARY
-    # ============================================
-    
-    PUBLIC_IP=$(curl -s ifconfig.me 2>/dev/null || echo "your-server-ip")
-    
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo -e "${GREEN}✅ PRODUCTION DEPLOYMENT COMPLETED!${NC}"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-    echo -e "${BLUE}🌐 Access your application:${NC}"
-    echo "   http://$PUBLIC_IP"
-    echo "   http://localhost"
-    echo ""
-    echo -e "${BLUE}📊 Service Management:${NC}"
-    echo "   Status:    sudo systemctl status product-app"
-    echo "   Restart:   sudo systemctl restart product-app"
-    echo "   Logs:      sudo journalctl -u product-app -f"
-    echo "   Nginx:     sudo systemctl restart nginx"
-    echo ""
-    echo -e "${BLUE}📝 Log Files:${NC}"
-    echo "   App:       sudo journalctl -u product-app"
-    echo "   Nginx:     sudo tail -f /var/log/nginx/product-app-access.log"
-    echo ""
-    echo -e "${YELLOW}⚠️  AWS Security Group - Required ports:${NC}"
-    echo "   ✓ Port 22 (SSH)"
-    echo "   ✓ Port 80 (HTTP)"
-    echo "   ✓ Port 443 (HTTPS) - optional"
-    echo "   ✗ Port 3000 - DO NOT expose (internal only)"
-    echo ""
-    echo -e "${GREEN}🎉 Production deployment successful!${NC}"
+
+# Copy to nginx
+$SUDO cp "nginx.conf" /etc/nginx/sites-available/product-app
+
+# Remove default site
+if [ -f /etc/nginx/sites-enabled/default ]; then
+    $SUDO rm /etc/nginx/sites-enabled/default
 fi
+
+# Enable site
+$SUDO ln -sf /etc/nginx/sites-available/product-app /etc/nginx/sites-enabled/product-app
+
+echo -e "${GREEN}✓ Nginx configuration created${NC}"
+
+# ============================================
+# START SERVICES WITH PM2
+# ============================================
+
+echo ""
+echo "Starting services..."
+
+# Test nginx config
+if $SUDO nginx -t; then
+    echo -e "${GREEN}✓ Nginx configuration valid${NC}"
+else
+    echo -e "${RED}❌ Nginx configuration test failed${NC}"
+    exit 1
+fi
+
+# Stop existing PM2 process if running
+pm2 delete product-app 2>/dev/null || true
+
+# Start application with PM2
+pm2 start ecosystem.config.js
+
+# Save PM2 process list
+pm2 save
+
+# Setup PM2 to start on system boot
+pm2 startup systemd -u $USER --hp $HOME
+
+echo -e "${YELLOW}⚠️  Important: Run the command above (if shown) to enable PM2 startup on boot${NC}"
+echo ""
+
+# Restart nginx
+$SUDO systemctl restart nginx
+
+echo -e "${GREEN}✓ Services started${NC}"
+
+# Check service status
+sleep 2
+
+# Check PM2 status
+if pm2 list | grep -q "product-app.*online"; then
+    echo -e "${GREEN}✓ Application is running with PM2${NC}"
+else
+    echo -e "${RED}❌ Application failed to start. Check: pm2 logs product-app${NC}"
+    exit 1
+fi
+
+if $SUDO systemctl is-active --quiet nginx; then
+    echo -e "${GREEN}✓ Nginx service is running${NC}"
+else
+    echo -e "${RED}❌ Nginx failed to start${NC}"
+    exit 1
+fi
+
+echo ""
+
+# ============================================
+# PRODUCTION DEPLOYMENT SUMMARY
+# ============================================
+
+PUBLIC_IP=$(curl -s ifconfig.me 2>/dev/null || echo "your-server-ip")
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo -e "${GREEN}✅ PRODUCTION DEPLOYMENT COMPLETED!${NC}"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo -e "${BLUE}🌐 Access your application:${NC}"
+echo "   http://$PUBLIC_IP"
+echo "   http://localhost"
+echo ""
+echo -e "${BLUE}📊 PM2 Process Management:${NC}"
+echo "   Status:    pm2 status"
+echo "   List:      pm2 list"
+echo "   Restart:   pm2 restart product-app"
+echo "   Stop:      pm2 stop product-app"
+echo "   Logs:      pm2 logs product-app"
+echo "   Monitor:   pm2 monit"
+echo ""
+echo -e "${BLUE}🔧 Nginx Management:${NC}"
+echo "   Restart:   sudo systemctl restart nginx"
+echo "   Status:    sudo systemctl status nginx"
+echo "   Logs:      sudo tail -f /var/log/nginx/product-app-access.log"
+echo ""
+echo -e "${BLUE}📝 Application Log Files:${NC}"
+echo "   PM2 Logs:  $APP_ROOT/logs/"
+echo "   Out:       pm2 logs product-app --out"
+echo "   Error:     pm2 logs product-app --err"
+echo ""
+echo -e "${YELLOW}⚠️  AWS Security Group - Required ports:${NC}"
+echo "   ✓ Port 22 (SSH)"
+echo "   ✓ Port 80 (HTTP)"
+echo "   ✓ Port 443 (HTTPS) - optional"
+echo "   ✗ Port 3000 - DO NOT expose (internal only)"
+echo ""
+echo -e "${GREEN}🎉 Production deployment successful with PM2!${NC}"
+echo -e "${BLUE}💡 PM2 will automatically restart your app on system reboot${NC}"
