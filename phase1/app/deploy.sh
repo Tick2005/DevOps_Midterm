@@ -304,7 +304,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 # Check if MongoDB URI is valid
-if [ -n "$MONGODB_URI" ] && [[ $MONGODB_URI == mongodb+srv://* ]] && [[ $MONGODB_URI != *"<username>"* ]]; then
+if [ -n "$MONGODB_URI" ] && [[ $MONGODB_URI == mongodb+srv://* ]] && [[ $MONGODB_URI != *"<username>"* ]] && [[ $MONGODB_URI != *"<password>"* ]] && [[ $MONGODB_URI != *"<cluster>"* ]]; then
     echo -e "${GREEN}✓ MongoDB Atlas URI configured${NC}"
     # Hide password in display
     DISPLAY_URI=$(echo "$MONGODB_URI" | sed 's/:\/\/[^:]*:[^@]*@/:\/\/***:***@/')
@@ -316,15 +316,21 @@ if [ -n "$MONGODB_URI" ] && [[ $MONGODB_URI == mongodb+srv://* ]] && [[ $MONGODB
     echo "   3. Cluster name is correct (including subdomain)"
     echo ""
 else
-    echo -e "${RED}❌ MongoDB URI not properly configured${NC}"
+    echo -e "${YELLOW}⚠️  MongoDB URI contains placeholders or is not configured${NC}"
     echo ""
-    read -p "Do you want to reconfigure MongoDB now? (y/n): " -n 1 -r
+    read -p "Do you want to configure MongoDB now? (y/n): " -n 1 -r
     echo ""
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         create_env_file
+        # Reload the new configuration
+        set -a
+        source "$ENV_FILE"
+        set +a
+        echo ""
+        echo -e "${GREEN}✓ MongoDB configuration updated${NC}"
     else
-        echo -e "${RED}❌ Cannot continue without valid MongoDB configuration${NC}"
-        exit 1
+        echo -e "${YELLOW}⚠️  Continuing with current configuration...${NC}"
+        echo -e "${YELLOW}⚠️  Note: Application may not work properly without valid MongoDB credentials${NC}"
     fi
 fi
 
