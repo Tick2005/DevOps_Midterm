@@ -177,29 +177,44 @@ EOF
 # LOAD OR CREATE .ENV FILE
 # ============================================
 
-if [ -f "$ENV_FILE" ]; then
-    echo "📄 Loading environment variables from .env..."
-    set -a
-    source "$ENV_FILE"
-    set +a
-    echo -e "${GREEN}✓ Environment variables loaded${NC}"
-    
-    # Validate required variables for production
-    if [ -z "$MONGODB_URI" ] || [[ $MONGODB_URI == *"username"* ]] || [[ $MONGODB_URI == *"password"* ]]; then
-        echo -e "${YELLOW}⚠ .env file exists but MongoDB URI is not configured properly${NC}"
-        read -p "Do you want to reconfigure? (y/n): " -n 1 -r
-        echo ""
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            create_env_file
-        else
-            echo -e "${RED}❌ Valid MongoDB URI required for production mode${NC}"
-            exit 1
-        fi
-    fi
-else
+if [ ! -f "$ENV_FILE" ]; then
     echo -e "${YELLOW}⚠ .env file not found.${NC}"
-    echo -e "${YELLOW}Production mode requires environment configuration.${NC}"
-    create_env_file
+    
+    # Copy from .env.example if it exists
+    if [ -f "$APP_ROOT/.env.example" ]; then
+        echo "Creating .env from .env.example template..."
+        cp "$APP_ROOT/.env.example" "$ENV_FILE"
+        chmod 600 "$ENV_FILE"
+        echo -e "${GREEN}✓ .env file created from template${NC}"
+    else
+        echo -e "${RED}❌ .env.example not found. Creating empty .env file...${NC}"
+        touch "$ENV_FILE"
+        chmod 600 "$ENV_FILE"
+    fi
+fi
+
+# Load environment variables from .env
+echo "📄 Loading environment variables from .env..."
+set -a
+source "$ENV_FILE"
+set +a
+echo -e "${GREEN}✓ Environment variables loaded${NC}"
+
+# Check if MongoDB URI needs configuration
+if [ -z "$MONGODB_URI" ] || [[ $MONGODB_URI == *"<username>"* ]] || [[ $MONGODB_URI == *"<password>"* ]] || [[ $MONGODB_URI == *"<cluster>"* ]]; then
+    echo ""
+    echo -e "${YELLOW}⚠ MongoDB URI is not configured yet${NC}"
+    echo -e "${YELLOW}Current URI contains placeholders: <username>, <password>, <cluster>${NC}"
+    echo ""
+    read -p "Do you want to configure MongoDB now? (y/n): " -n 1 -r
+    echo ""
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        create_env_file
+    else
+        echo -e "${YELLOW}⚠ Continuing with current configuration...${NC}"
+        echo -e "${YELLOW}⚠ Note: Application may not work properly without valid MongoDB credentials${NC}"
+        echo -e "${YELLOW}⚠ You can configure it later by editing the .env file${NC}"
+    fi
 fi
 
 # Set defaults
@@ -335,6 +350,8 @@ public/uploads/*
 .DS_Store
 EOF
     echo -e "${GREEN}✓ .gitignore created${NC}"
+else
+    echo -e "${GREEN}✓ .gitignore already exists${NC}"
 fi
 
 # Create uploads directory
