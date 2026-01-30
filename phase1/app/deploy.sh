@@ -569,10 +569,14 @@ pm2 start ecosystem.config.js
 # Save PM2 process list
 pm2 save
 
-# Setup PM2 to start on system boot
-pm2 startup systemd -u $USER --hp $HOME
-
-echo -e "${YELLOW}⚠️  Important: Run the command above (if shown) to enable PM2 startup on boot${NC}"
+# Setup PM2 to start on system boot automatically
+echo "Setting up PM2 startup on system boot..."
+STARTUP_CMD=$(pm2 startup systemd -u $USER --hp $HOME | grep "sudo env")
+if [ -n "$STARTUP_CMD" ]; then
+    echo "Executing: $STARTUP_CMD"
+    eval "$STARTUP_CMD" 2>/dev/null || echo -e "${BLUE}PM2 startup already configured${NC}"
+fi
+echo -e "${GREEN}✓ PM2 configured to start on system boot${NC}"
 echo ""
 
 # Restart nginx
