@@ -431,6 +431,16 @@ echo ""
 
 echo "Setting up PM2 configuration..."
 
+# Read environment variables from .env
+if [ -f "$ENV_FILE" ]; then
+    # Extract values from .env for PM2 config
+    ENV_MONGODB_URI=$(grep "^MONGODB_URI=" "$ENV_FILE" | cut -d '=' -f2-)
+    ENV_PORT=$(grep "^PORT=" "$ENV_FILE" | cut -d '=' -f2-)
+    ENV_HOST=$(grep "^HOST=" "$ENV_FILE" | cut -d '=' -f2-)
+    ENV_NODE_ENV=$(grep "^NODE_ENV=" "$ENV_FILE" | cut -d '=' -f2-)
+    ENV_DATA_SOURCE=$(grep "^DATA_SOURCE=" "$ENV_FILE" | cut -d '=' -f2-)
+fi
+
 cat > "ecosystem.config.js" << EOF
 module.exports = {
   apps: [{
@@ -441,9 +451,12 @@ module.exports = {
     watch: false,
     max_memory_restart: '1G',
     env: {
-      NODE_ENV: 'production',
-      PORT: ${PORT:-3000},
-      HOST: '0.0.0.0'
+      NODE_ENV: '${ENV_NODE_ENV:-production}',
+      PORT: ${ENV_PORT:-3000},
+      HOST: '${ENV_HOST:-0.0.0.0}',
+      MONGODB_URI: '${ENV_MONGODB_URI}',
+      MONGO_URI: '${ENV_MONGODB_URI}',
+      DATA_SOURCE: '${ENV_DATA_SOURCE:-mongodb}'
     },
     error_file: './logs/pm2-error.log',
     out_file: './logs/pm2-out.log',
