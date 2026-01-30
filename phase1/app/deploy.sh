@@ -1,16 +1,13 @@
 #!/bin/bash
 
 # ============================================
-# UNIFIED DEPLOYMENT & START SCRIPT
+# PRODUCTION DEPLOYMENT SCRIPT
 # ============================================
-# This script can run in two modes:
-# 1. Development Mode: Quick start with npm (like start.sh)
-# 2. Production Mode: Full setup with systemd + nginx (like deploy-production.sh)
+# This script deploys the application in production mode
+# with full setup including systemd service and nginx reverse proxy.
 #
 # Usage:
-#   ./deploy.sh              # Auto-detect mode
-#   ./deploy.sh dev          # Force development mode
-#   ./deploy.sh prod         # Force production mode
+#   ./deploy.sh              # Deploy in production mode
 
 set -e  # Exit on error
 
@@ -27,40 +24,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_ROOT="$SCRIPT_DIR"
 
 # ============================================
-# DETECT DEPLOYMENT MODE
+# SET PRODUCTION MODE
 # ============================================
 
-# Check for command line argument
-if [ "$1" == "dev" ]; then
-    MODE="development"
-elif [ "$1" == "prod" ] || [ "$1" == "production" ]; then
-    MODE="production"
-else
-    # Auto-detect based on system
-    if [ -f "/etc/systemd/system/product-app.service" ] || [ -d "/etc/nginx" ]; then
-        MODE="production"
-    else
-        MODE="development"
-    fi
-    
-    # Ask user
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo -e "${CYAN}🚀 DEPLOYMENT MODE SELECTION${NC}"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-    echo "1) Development  - Quick start with npm (foreground)"
-    echo "2) Production   - Full setup with systemd + nginx (recommended for AWS)"
-    echo ""
-    read -p "Select mode [1/2] (default: 1): " -n 1 -r
-    echo ""
-    echo ""
-    
-    if [[ $REPLY =~ ^[2]$ ]]; then
-        MODE="production"
-    else
-        MODE="development"
-    fi
-fi
+MODE="production"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo -e "${CYAN}🚀 PRODUCT MANAGEMENT SYSTEM${NC}"
@@ -172,15 +139,9 @@ create_env_file() {
     read -p "Application Port [3000]: " APP_PORT
     APP_PORT=${APP_PORT:-3000}
     
-    # Get host binding
-    if [ "$MODE" == "production" ]; then
-        APP_HOST="0.0.0.0"
-        APP_ENV="production"
-    else
-        read -p "Host [0.0.0.0]: " APP_HOST
-        APP_HOST=${APP_HOST:-0.0.0.0}
-        APP_ENV="development"
-    fi
+    # Get host binding (production settings)
+    APP_HOST="0.0.0.0"
+    APP_ENV="production"
     
     echo ""
     echo -e "${GREEN}Creating .env file...${NC}"
@@ -224,43 +185,21 @@ if [ -f "$ENV_FILE" ]; then
     echo -e "${GREEN}✓ Environment variables loaded${NC}"
     
     # Validate required variables for production
-    if [ "$MODE" == "production" ]; then
-        if [ -z "$MONGODB_URI" ] || [[ $MONGODB_URI == *"username"* ]] || [[ $MONGODB_URI == *"password"* ]]; then
-            echo -e "${YELLOW}⚠ .env file exists but MongoDB URI is not configured properly${NC}"
-            read -p "Do you want to reconfigure? (y/n): " -n 1 -r
-            echo ""
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                create_env_file
-            else
-                echo -e "${RED}❌ Valid MongoDB URI required for production mode${NC}"
-                exit 1
-            fi
+    if [ -z "$MONGODB_URI" ] || [[ $MONGODB_URI == *"username"* ]] || [[ $MONGODB_URI == *"password"* ]]; then
+        echo -e "${YELLOW}⚠ .env file exists but MongoDB URI is not configured properly${NC}"
+        read -p "Do you want to reconfigure? (y/n): " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            create_env_file
+        else
+            echo -e "${RED}❌ Valid MongoDB URI required for production mode${NC}"
+            exit 1
         fi
     fi
 else
     echo -e "${YELLOW}⚠ .env file not found.${NC}"
-    
-    if [ "$MODE" == "production" ]; then
-        echo -e "${YELLOW}Production mode requires environment configuration.${NC}"
-        create_env_file
-    else
-        echo "Creating .env for development..."
-        if [ -f "$APP_ROOT/.env.example" ]; then
-            cp "$APP_ROOT/.env.example" "$ENV_FILE"
-            echo -e "${GREEN}✓ Created .env from template${NC}"
-            
-            # Still prompt for MongoDB if needed
-            set -a
-            source "$ENV_FILE"
-            set +a
-            
-            if [ -z "$MONGODB_URI" ] || [[ $MONGODB_URI == *"<username>"* ]]; then
-                create_env_file
-            fi
-        else
-            create_env_file
-        fi
-    fi
+    echo -e "${YELLOW}Production mode requires environment configuration.${NC}"
+    create_env_file
 fi
 
 # Set defaults
@@ -328,14 +267,12 @@ else
     echo -e "${GREEN}✓ Node.js already installed ($NODE_VERSION)${NC}"
 fi
 
-# Install nginx for production mode
-if [ "$MODE" == "production" ]; then
-    if ! command -v nginx &> /dev/null; then
-        echo "Installing nginx..."
-        install_package "nginx"
-    else
-        echo -e "${GREEN}✓ Nginx already installed${NC}"
-    fi
+# Install nginx
+if ! command -v nginx &> /dev/null; then
+    echo "Installing nginx..."
+    install_package "nginx"
+else
+    echo -e "${GREEN}✓ Nginx already installed${NC}"
 fi
 
 echo ""
@@ -410,11 +347,7 @@ fi
 # Install npm dependencies
 if [ ! -d "node_modules" ]; then
     echo "Installing npm packages..."
-    if [ "$MODE" == "production" ]; then
-        npm install --production
-    else
-        npm install
-    fi
+    npm install --production
     echo -e "${GREEN}✓ Dependencies installed${NC}"
 else
     echo -e "${GREEN}✓ Dependencies already installed${NC}"
@@ -423,53 +356,8 @@ fi
 echo ""
 
 # ============================================
-# MODE-SPECIFIC DEPLOYMENT
+# PRODUCTION MODE - SYSTEMD + NGINX
 # ============================================
-
-if [ "$MODE" == "development" ]; then
-    # ============================================
-    # DEVELOPMENT MODE - START WITH NPM
-    # ============================================
-    
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo -e "${CYAN}🚀 Starting Application (Development Mode)${NC}"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-    
-    # Get server IP
-    if command -v curl &> /dev/null; then
-        SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || echo "localhost")
-    else
-        SERVER_IP="localhost"
-    fi
-    
-    echo -e "${BLUE}📋 Configuration:${NC}"
-    echo "   Port:        $PORT"
-    echo "   Data Source: MongoDB Atlas"
-    echo ""
-    
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo -e "${GREEN}✅ SETUP COMPLETED!${NC}"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-    echo -e "${BLUE}🌐 Access your application at:${NC}"
-    echo "   Local:  http://localhost:$PORT"
-    if [ "$SERVER_IP" != "localhost" ]; then
-        echo "   Remote: http://$SERVER_IP:$PORT"
-        echo ""
-        echo -e "${YELLOW}⚠️  Note: For remote access, ensure port $PORT is open in Security Group${NC}"
-    fi
-    echo ""
-    echo -e "${GREEN}✨ Starting application...${NC}"
-    echo ""
-    
-    # Start the application
-    npm start
-
-else
-    # ============================================
-    # PRODUCTION MODE - SYSTEMD + NGINX
-    # ============================================
     
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo -e "${CYAN}🔧 Production Deployment${NC}"
@@ -693,4 +581,3 @@ EOF
     echo "   ✗ Port 3000 - DO NOT expose (internal only)"
     echo ""
     echo -e "${GREEN}🎉 Production deployment successful!${NC}"
-fi
