@@ -252,7 +252,7 @@ if [ -f "$ENV_FILE" ]; then
     echo ""
     
     # Ask if user wants to update configuration
-    read -p "Do you want to update the .env configuration? (y/n): " -n 1 -r
+    read -p "Do you want to update the .env configuration? (y/n) [n]: " -n 1 -r
     echo ""
     echo ""
     
@@ -260,6 +260,7 @@ if [ -f "$ENV_FILE" ]; then
         update_env_file
     else
         echo -e "${BLUE}✓ Using existing configuration${NC}"
+        echo ""
     fi
 else
     echo -e "${YELLOW}⚠ .env file not found.${NC}"
@@ -431,17 +432,7 @@ echo ""
 
 echo "Setting up PM2 configuration..."
 
-# Read environment variables from .env
-if [ -f "$ENV_FILE" ]; then
-    # Extract values from .env for PM2 config
-    ENV_MONGODB_URI=$(grep "^MONGODB_URI=" "$ENV_FILE" | cut -d '=' -f2-)
-    ENV_PORT=$(grep "^PORT=" "$ENV_FILE" | cut -d '=' -f2-)
-    ENV_HOST=$(grep "^HOST=" "$ENV_FILE" | cut -d '=' -f2-)
-    ENV_NODE_ENV=$(grep "^NODE_ENV=" "$ENV_FILE" | cut -d '=' -f2-)
-    ENV_DATA_SOURCE=$(grep "^DATA_SOURCE=" "$ENV_FILE" | cut -d '=' -f2-)
-fi
-
-cat > "ecosystem.config.js" << EOF
+cat > "ecosystem.config.js" << 'EOF'
 module.exports = {
   apps: [{
     name: 'product-app',
@@ -450,14 +441,7 @@ module.exports = {
     autorestart: true,
     watch: false,
     max_memory_restart: '1G',
-    env: {
-      NODE_ENV: '${ENV_NODE_ENV:-production}',
-      PORT: ${ENV_PORT:-3000},
-      HOST: '${ENV_HOST:-0.0.0.0}',
-      MONGODB_URI: '${ENV_MONGODB_URI}',
-      MONGO_URI: '${ENV_MONGODB_URI}',
-      DATA_SOURCE: '${ENV_DATA_SOURCE:-mongodb}'
-    },
+    env_file: './.env',
     error_file: './logs/pm2-error.log',
     out_file: './logs/pm2-out.log',
     log_file: './logs/pm2-combined.log',
@@ -576,8 +560,13 @@ fi
 # Stop existing PM2 process if running
 pm2 delete product-app 2>/dev/null || true
 
-# Start application with PM2
-pm2 start ecosystem.config.js
+# Load .env and start application with PM2
+echo "Starting application with environment variables from .env..."
+set -a
+source "$ENV_FILE"
+set +a
+
+pm2 start ecosystem.config.js --update-env
 
 # Save PM2 process list
 pm2 save
