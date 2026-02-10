@@ -1099,6 +1099,14 @@ textarea.form-control {
   }
 }
 
+/* Medium screens (tablets and small laptops: 768px to 1199px) - Hide description to prevent horizontal scroll */
+@media (min-width: 768px) and (max-width: 1199px) {
+  .table-custom thead th:nth-child(5),
+  .table-custom tbody td:nth-child(5) {
+    display: none;
+  }
+}
+
 /* Large devices (desktops, 992px and above) */
 @media (max-width: 991.98px) {
   .col-lg-4,
