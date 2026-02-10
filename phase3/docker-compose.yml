@@ -1,0 +1,104 @@
+version: '3.8'
+
+# ============================================
+# DOCKER COMPOSE CONFIGURATION FOR PHASE 3
+# ============================================
+# This file defines the complete application stack:
+# - Web Application (Node.js)
+# - MongoDB Database
+# - Persistent Volumes for data and uploads
+
+services:
+  # ============================================
+  # MONGODB DATABASE SERVICE
+  # ============================================
+  mongodb:
+    image: mongo:6.0
+    container_name: product-mongodb
+    restart: always
+    environment:
+      # MongoDB root credentials
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-changeme}
+      # Database name
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-productdb}
+    volumes:
+      # Persistent storage for MongoDB data
+      - mongodb_data:/data/db
+      # MongoDB configuration
+      - mongodb_config:/data/configdb
+    networks:
+      - app-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    # Internal port only - not exposed to host for security
+    # ports:
+    #   - "27017:27017"  # Uncomment for debugging only
+
+  # ============================================
+  # WEB APPLICATION SERVICE
+  # ============================================
+  web:
+    # Pull pre-built image from Docker Hub
+    # Replace 'your-dockerhub-username' with your actual username
+    image: ${DOCKER_IMAGE:-your-dockerhub-username/product-app:latest}
+    container_name: product-web
+    restart: always
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      # Application settings
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      
+      # MongoDB connection (using container name as hostname)
+      MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-changeme}@mongodb:27017/${MONGO_DATABASE:-productdb}?authSource=admin
+      MONGO_URI: mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-changeme}@mongodb:27017/${MONGO_DATABASE:-productdb}?authSource=admin
+      DATA_SOURCE: mongodb
+    volumes:
+      # Persistent storage for uploaded files
+      - uploads_data:/app/public/uploads
+    ports:
+      # Expose to host for nginx reverse proxy
+      - "3000:3000"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# ============================================
+# DOCKER NETWORKS
+# ============================================
+networks:
+  app-network:
+    driver: bridge
+    name: product-app-network
+
+# ============================================
+# DOCKER VOLUMES FOR PERSISTENT DATA
+# ============================================
+volumes:
+  # MongoDB database files
+  mongodb_data:
+    name: product_mongodb_data
+    driver: local
+  
+  # MongoDB configuration files
+  mongodb_config:
+    name: product_mongodb_config
+    driver: local
+  
+  # Application uploaded files
+  uploads_data:
+    name: product_uploads_data
+    driver: local
