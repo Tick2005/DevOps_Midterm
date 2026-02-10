@@ -111,4 +111,21 @@ document.addEventListener('DOMContentLoaded', function () {
     };
     reader.readAsDataURL(file);
   });
+
+  // Mobile card view event handlers
+  const mobileProductsView = document.querySelector('.mobile-products-view');
+  if (mobileProductsView) {
+    mobileProductsView.addEventListener('click', function (e) {
+      const card = e.target.closest('.product-card');
+      if (!card) return;
+      
+      if (e.target.classList.contains('btn-edit-card') || e.target.closest('.btn-edit-card')) {
+        openModalForEdit(card);
+      } else if (e.target.classList.contains('btn-delete-card') || e.target.closest('.btn-delete-card')) {
+        const id = card.dataset.id;
+        const productName = card.dataset.name || 'this product';
+        showDeleteModal(productName, id);
+      }
+    });
+  }
 });
