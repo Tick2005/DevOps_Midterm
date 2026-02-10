@@ -1101,8 +1101,7 @@ textarea.form-control {
 
 /* Medium screens (tablets and small laptops: 768px to 1199px) - Hide description to prevent horizontal scroll */
 @media (min-width: 768px) and (max-width: 1199px) {
-  .table-custom thead th:nth-child(5),
-  .table-custom tbody td:nth-child(5) {
+  .description-column {
     display: none;
   }
 }
