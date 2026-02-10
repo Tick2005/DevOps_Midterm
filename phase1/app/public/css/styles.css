@@ -563,7 +563,7 @@ body {
   
   /* Image upload area responsive cây layout 2 cột */
   .image-upload-area {
-    height: 150px; /* Giảm chiều cao để phù hợp với layout ngang */
+    height: 160px; /* Giảm chiều cao để phù hợp với layout ngang */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -874,7 +874,7 @@ textarea.form-control {
   position: relative;
   width: 100%;
   max-width: 100%;
-  height: 180px;
+  height: 140px;
   margin: 0 auto 1rem;
   border-radius: 10px;
   border: 2px dashed #cbd5e1;
@@ -885,6 +885,7 @@ textarea.form-control {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-direction: column;
 }
 
 .image-upload-area:hover {
@@ -894,13 +895,14 @@ textarea.form-control {
 }
 
 .image-upload-area img {
-  width: 100%;
-  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
   object-fit: contain;
-  padding: 0.8rem;
+  border-radius: 8px;
   transition: all 0.3s ease;
   display: block;
-  margin: 0 auto;
 }
 
 .upload-overlay {
@@ -942,11 +944,13 @@ textarea.form-control {
 }
 
 #img-preview {
-  border-radius: 12px;
+  border-radius: 8px;
   transition: all 0.3s ease;
   max-height: 100%;
-  width: 100%;
-  object-fit: cover;
+  max-width: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
 }
 
 /* ========================================
@@ -1157,11 +1161,11 @@ textarea.form-control {
   
   /* Desktop modal improvements */
   .modal-lg {
-    max-width: 580px; /* Giảm độ rộng modal trên desktop */
+    max-width: 600px; /* Tăng độ rộng modal trên desktop để cân đối */
   }
   
   .image-upload-area {
-    height: 160px; /* Giảm chiều cao trên desktop */
+    height: 180px; /* Tăng chiều cao phù hợp trên desktop */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1202,7 +1206,7 @@ textarea.form-control {
   }
   
   .modal-dialog { 
-    max-width: 580px;
+    max-width: 520px;
   }
   
   .header-card {
@@ -1228,7 +1232,7 @@ textarea.form-control {
   
   /* Image upload tablet */
   .image-upload-area {
-    height: 220px;
+    height: 160px;
   }
   
   /* Tablet - 2 products per row */
@@ -1528,8 +1532,13 @@ textarea.form-control {
   
   /* Modal */
   .modal-dialog {
-    margin: 0.5rem;
-    max-width: calc(100% - 1rem);
+    margin: 0.5rem auto;
+    max-width: 90%;
+  }
+  
+  .modal-lg {
+    max-width: 450px;
+    margin: 0.5rem auto;
   }
   
   .modal-header {
@@ -1574,7 +1583,7 @@ textarea.form-control {
   /* Image upload area mobile */
   .image-upload-area {
     max-width: 100%;
-    height: 150px;
+    height: 120px;
   }
   
   .upload-overlay i {
@@ -1611,6 +1620,45 @@ textarea.form-control {
   .footer-left,
   .footer-right {
     justify-content: center;
+  }
+}
+
+/* Extra small mobile devices (max 400px) - Điện thoại rất nhỏ */
+@media (max-width: 400px) {
+  .modal-dialog {
+    margin: 0.25rem auto;
+    max-width: 95%;
+  }
+  
+  .modal-lg {
+    max-width: 320px;
+    margin: 0.25rem auto;
+  }
+  
+  .modal-body {
+    padding: 0.875rem;
+  }
+  
+  .modal-header {
+    padding: 0.75rem;
+  }
+  
+  .modal-footer {
+    padding: 0.75rem;
+  }
+  
+  .image-upload-area {
+    height: 100px;
+  }
+  
+  .form-control,
+  .form-select {
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
+  }
+  
+  .form-label {
+    font-size: 0.8rem;
   }
 }
 
@@ -1722,8 +1770,13 @@ textarea.form-control {
   }
   
   .modal-dialog {
-    margin: 0.375rem;
-    max-width: calc(100% - 0.75rem);
+    margin: 0.375rem auto;
+    max-width: 90%;
+  }
+  
+  .modal-lg {
+    max-width: 360px;
+    margin: 0.375rem auto;
   }
   
   .modal-header {
