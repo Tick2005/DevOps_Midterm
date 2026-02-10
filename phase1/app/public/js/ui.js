@@ -129,3 +129,17 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 });
+
+// Function to toggle description on mobile
+function toggleDescription(button) {
+  const card = button.closest('.product-card');
+  const cardBody = card.querySelector('.product-card-body');
+  
+  if (cardBody.classList.contains('show')) {
+    cardBody.classList.remove('show');
+    button.textContent = 'View Details';
+  } else {
+    cardBody.classList.add('show');
+    button.textContent = 'Hide Details';
+  }
+}
