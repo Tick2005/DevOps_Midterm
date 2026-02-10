@@ -25,6 +25,13 @@ fi
 BRANCH_NAME=$1
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
+# Validate branch name format (only allow alphanumeric, -, _, /)
+if ! [[ "$BRANCH_NAME" =~ ^[a-zA-Z0-9/_-]+$ ]]; then
+    echo -e "${RED}Error: Invalid branch name format${NC}"
+    echo "Branch name should only contain letters, numbers, hyphens, underscores, and slashes"
+    exit 1
+fi
+
 # Check if we're on the branch we're trying to delete
 if [ "$CURRENT_BRANCH" == "$BRANCH_NAME" ]; then
     echo -e "${RED}Error: Cannot delete the current branch${NC}"
