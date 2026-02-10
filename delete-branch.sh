@@ -2,6 +2,9 @@
 
 # Script to delete Git branches (both local and remote)
 # Cách sử dụng: ./delete-branch.sh <tên-nhánh>
+# 
+# Lưu ý: Trước khi chạy lần đầu, cần cấp quyền thực thi:
+# chmod +x delete-branch.sh
 
 set -e
 
@@ -32,8 +35,14 @@ fi
 # Check if branch exists locally
 if git show-ref --verify --quiet refs/heads/"$BRANCH_NAME"; then
     echo -e "${YELLOW}Deleting local branch: $BRANCH_NAME${NC}"
-    git branch -D "$BRANCH_NAME"
-    echo -e "${GREEN}✓ Local branch deleted successfully${NC}"
+    # Try safe delete first, fallback to force delete if needed
+    if git branch -d "$BRANCH_NAME" 2>/dev/null; then
+        echo -e "${GREEN}✓ Local branch deleted successfully${NC}"
+    else
+        echo -e "${YELLOW}Branch has unmerged changes. Force deleting...${NC}"
+        git branch -D "$BRANCH_NAME"
+        echo -e "${GREEN}✓ Local branch force deleted successfully${NC}"
+    fi
 else
     echo -e "${YELLOW}Local branch not found, skipping...${NC}"
 fi

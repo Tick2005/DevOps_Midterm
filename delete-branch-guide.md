@@ -19,10 +19,11 @@ git branch -D <tên-nhánh>
 Để xóa một nhánh đã được push lên GitHub:
 
 ```bash
-# Cách 1: Sử dụng git push
+# Cách 1: Sử dụng git push (khuyến nghị - dễ hiểu)
 git push origin --delete <tên-nhánh>
 
-# Cách 2: Sử dụng cú pháp rút gọn
+# Cách 2: Sử dụng cú pháp rút gọn (hoạt động bằng cách push 'nothing' đến nhánh)
+# Lưu ý: Cú pháp này ít trực quan hơn, nên ưu tiên dùng --delete
 git push origin :<tên-nhánh>
 ```
 
