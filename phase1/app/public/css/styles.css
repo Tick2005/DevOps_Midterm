@@ -530,6 +530,37 @@ body {
   }
 }
 
+/* Tablet and above - ALWAYS show description */
+@media (min-width: 768px) {
+  .product-card-body {
+    display: block !important;
+  }
+  
+  .btn-toggle-desc {
+    display: none !important; /* Ẩn nút toggle trên tablet+ */
+  }
+  
+  /* Modal responsive - 2 cột ngang trên tablet+ */
+  .modal-lg {
+    max-width: 900px; /* Tăng độ rộng modal */
+  }
+  
+  /* Image upload area responsive cho layout 2 cột */
+  .image-upload-area {
+    height: 200px; /* Giảm chiều cao để phù hợp với layout ngang */
+  }
+  
+  /* Đảm bảo form controls có kích thước phù hợp */
+  .form-control,
+  .input-group {
+    font-size: 0.95rem;
+  }
+  
+  textarea.form-control {
+    min-height: 80px;
+  }
+}
+
 /* ========================================
    PAGINATION SECTION
    ======================================== */
@@ -1097,6 +1128,15 @@ textarea.form-control {
     white-space: normal;
     word-wrap: break-word;
   }
+  
+  /* Desktop modal improvements */
+  .modal-lg {
+    max-width: 1000px; /* Tăng độ rộng modal trên desktop */
+  }
+  
+  .image-upload-area {
+    height: 250px; /* Tăng chiều cao trên desktop */
+  }
 }
 
 /* Large devices (desktops, 992px and above) */
@@ -1172,23 +1212,38 @@ textarea.form-control {
     width: calc(50% - 0.5rem);
   }
   
+  /* LAYOUT 2 CỘT NGANG CHO TABLET - Hình bên trái, thông tin bên phải */
   .product-card-header {
-    flex-direction: column;
+    flex-direction: row;
     padding: 1rem;
-    gap: 0.75rem;
+    gap: 1rem;
+    align-items: flex-start;
   }
   
   .product-card-image {
-    width: 100%;
-    height: 140px;
+    width: 100px;
+    height: 100px;
+    flex-shrink: 0;
   }
   
   .product-card-info {
-    width: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 0.5rem;
   }
   
   .product-card-name {
     font-size: 1.05rem;
+    margin-bottom: 0.25rem;
+  }
+  
+  .product-card-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: flex-start;
   }
   
   .product-card-price {
@@ -1360,9 +1415,47 @@ textarea.form-control {
     font-size: 0.7rem;
   }
   
+  /* MOBILE - Ẩn description mặc định */
   .product-card-body {
     padding: 0.75rem 0.875rem;
     gap: 0.75rem;
+    display: none; /* Ẩn description mặc định trên mobile */
+    transition: all 0.3s ease; /* Smooth animation */
+  }
+  
+  .product-card-body.show {
+    display: block; /* Hiện khi có class 'show' */
+    animation: slideDown 0.3s ease;
+  }
+  
+  /* Animation for description toggle */
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      max-height: 0;
+    }
+    to {
+      opacity: 1;
+      max-height: 200px;
+    }
+  }
+  
+  /* Nút toggle description cho mobile */
+  .btn-toggle-desc {
+    background: none;
+    border: none;
+    color: #6366f1;
+    font-size: 0.8rem;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0;
+    margin-top: 0.25rem;
+    transition: color 0.2s ease;
+  }
+  
+  .btn-toggle-desc:hover {
+    color: #4338ca;
+    text-decoration: none;
   }
   
   .product-card-actions {
