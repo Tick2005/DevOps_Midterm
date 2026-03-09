@@ -1,6 +1,16 @@
 # DevOps_Midterm
 
-## 📋 Table of Contents
+## Table of Contents
+
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Tech Stack](#tech-stack)
+- [Prerequisites](#prerequisites)
+- [Deployment Steps](#deployment-steps)
+- [Deployment Notes](#deployment-notes)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
+- [Version History](#version-history)
 
 ---
 
@@ -36,4 +46,4 @@
 
 ---
 
-## 🔄 Version History
+## Version History
