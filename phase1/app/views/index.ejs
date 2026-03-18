@@ -20,26 +20,27 @@
 
     <!-- Table Section -->
     <div class="table-section">
-      <div class="table-responsive">
+      <!-- Desktop Table View -->
+      <div class="table-responsive desktop-view">
         <table class="table table-custom">
           <thead>
             <tr>
-              <th style="width:100px">
+              <th style="width:90px">
                 <i class="fas fa-image"></i> Photo
               </th>
-              <th>
+              <th style="width:25%">
                 <i class="fas fa-tag"></i> Product Name
               </th>
-              <th style="width:130px">
+              <th style="width:120px">
                 <i class="fas fa-dollar-sign"></i> Price
               </th>
-              <th style="width:130px">
+              <th style="width:120px">
                 <i class="fas fa-palette"></i> Color
               </th>
-              <th>
+              <th style="width:35%">
                 <i class="fas fa-align-left"></i> Description
               </th>
-              <th style="width:150px" class="text-center">
+              <th style="width:140px" class="text-center">
                 <i class="fas fa-cog"></i> Actions
               </th>
             </tr>
@@ -77,6 +78,50 @@
             <% }) %>
           </tbody>
         </table>
+      </div>
+
+      <!-- Mobile Card View -->
+      <div class="mobile-products-view">
+        <% products.forEach(function(p){ %>
+          <div class="product-card" 
+               data-id="<%= p.id %>" 
+               data-image="<%= p.imageUrl || '' %>"
+               data-name="<%= p.name %>"
+               data-price="<%= p.price %>"
+               data-color="<%= p.color %>"
+               data-description="<%= p.description || '' %>">
+            <div class="product-card-header">
+              <div class="product-card-image">
+                <img src="<%= p.imageUrl && p.imageUrl.length ? p.imageUrl : '/images/placeholder-80.png' %>" alt="<%= p.name %>">
+              </div>
+              <div class="product-card-info">
+                <h3 class="product-card-name"><%= p.name %></h3>
+                <div class="product-card-meta">
+                  <div class="product-card-price">$<%= p.price %></div>
+                  <span class="color-badge-mobile"><%= p.color %></span>
+                </div>
+                <!-- Toggle button cho mobile để hiện/ẩn description -->
+                <button class="btn-toggle-desc" onclick="toggleDescription(this)">View Details</button>
+              </div>
+            </div>
+            <div class="product-card-body">
+              <% if (p.description) { %>
+                <div class="product-card-row">
+                  <span class="product-card-label"><i class="fas fa-align-left"></i> Description:</span>
+                  <span class="product-card-desc"><%= p.description %></span>
+                </div>
+              <% } %>
+            </div>
+            <div class="product-card-actions">
+              <button class="btn-card-action btn-edit-card" title="Edit Product">
+                <i class="fas fa-edit"></i> Edit
+              </button>
+              <button class="btn-card-action btn-delete-card" title="Delete Product">
+                <i class="fas fa-trash-alt"></i> Delete
+              </button>
+            </div>
+          </div>
+        <% }) %>
       </div>
       
       <!-- Pagination Section -->
@@ -129,20 +174,43 @@
           <div class="modal-body">
             <input type="hidden" id="product-id">
             
+            <!-- Responsive Layout: 2 cột từ mobile lớn trở lên, 1 cột trên mobile nhỏ -->
             <div class="row g-4">
-              <!-- Left Column - Main Info -->
-              <div class="col-lg-8">
-                <!-- Product Name -->
+              <!-- Product Image - Left Column on Mobile Large+ -->
+              <div class="col-12 col-sm-5 col-lg-4">
                 <div class="form-group">
                   <label class="form-label">
-                    <i class="fas fa-tag"></i> Product Name
+                    <i class="fas fa-image"></i> Product Image
                   </label>
-                  <input id="name" name="name" type="text" class="form-control" 
-                         required placeholder="Enter product name">
+                  <div class="image-upload-area" onclick="document.getElementById('imageFile').click()">
+                    <img id="img-preview" src="/images/placeholder-80.png" alt="Preview">
+                    <div class="upload-overlay">
+                      <i class="fas fa-camera"></i>
+                      <span>Click to upload image</span>
+                      <small>PNG, JPG up to 5MB</small>
+                    </div>
+                  </div>
+                  <input id="imageFile" name="imageFile" type="file" 
+                         accept="image/*" class="d-none">
+                  <input type="hidden" id="imageUrl" name="imageUrl">
                 </div>
-                
-                <!-- Price and Color Row -->
+              </div>
+
+              <!-- Product Information - Right Column on Mobile Large+ -->
+              <div class="col-12 col-sm-7 col-lg-8">
                 <div class="row g-3">
+                  <!-- Product Name -->
+                  <div class="col-12">
+                    <div class="form-group">
+                      <label class="form-label">
+                        <i class="fas fa-tag"></i> Product Name
+                      </label>
+                      <input id="name" name="name" type="text" class="form-control" 
+                             required placeholder="Enter product name">
+                    </div>
+                  </div>
+                  
+                  <!-- Price -->
                   <div class="col-md-6">
                     <div class="form-group">
                       <label class="form-label">
@@ -158,6 +226,7 @@
                     </div>
                   </div>
                   
+                  <!-- Color -->
                   <div class="col-md-6">
                     <div class="form-group">
                       <label class="form-label">
@@ -172,36 +241,16 @@
                       </div>
                     </div>
                   </div>
-                </div>
-                
-                <!-- Description -->
-                <div class="form-group">
-                  <label class="form-label">
-                    <i class="fas fa-align-left"></i> Description
-                  </label>
-                  <textarea id="description" name="description" class="form-control" 
-                            rows="3" placeholder="Enter product description (optional)"></textarea>
-                </div>
-              </div>
-              
-              <!-- Right Column - Image Upload -->
-              <div class="col-lg-4">
-                <div class="form-group">
-                  <label class="form-label">
-                    <i class="fas fa-image"></i> Product Image
-                  </label>
-                  <div class="image-upload-box">
-                    <div class="image-preview-wrapper">
-                      <img id="img-preview" src="/images/placeholder-80.png" alt="Preview">
+                  
+                  <!-- Description -->
+                  <div class="col-12">
+                    <div class="form-group">
+                      <label class="form-label">
+                        <i class="fas fa-align-left"></i> Description
+                      </label>
+                      <textarea id="description" name="description" class="form-control" 
+                                rows="3" placeholder="Enter product description (optional)"></textarea>
                     </div>
-                    <input id="imageFile" name="imageFile" type="file" 
-                           accept="image/*" class="d-none">
-                    <input type="hidden" id="imageUrl" name="imageUrl">
-                    <button type="button" class="btn btn-upload" 
-                            onclick="document.getElementById('imageFile').click()">
-                      <i class="fas fa-cloud-upload-alt"></i> Choose Image
-                    </button>
-                    <small class="upload-hint">PNG, JPG up to 5MB</small>
                   </div>
                 </div>
               </div>
