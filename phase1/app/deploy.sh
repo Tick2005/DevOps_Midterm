@@ -76,6 +76,23 @@ fi
 
 ENV_FILE="$APP_ROOT/.env"
 
+load_env_file() {
+    set +e
+    set -a
+    source "$ENV_FILE"
+    local source_status=$?
+    set +a
+    set -e
+
+    if [ $source_status -ne 0 ]; then
+        echo -e "${RED}❌ Failed to load .env due to invalid syntax${NC}"
+        echo -e "${YELLOW}⚠ Tip: wrap MongoDB URI in double quotes if it contains placeholders like <username>${NC}"
+        return 1
+    fi
+
+    return 0
+}
+
 # ============================================
 # FUNCTION: CREATE .ENV FILE INTERACTIVELY
 # ============================================
@@ -149,8 +166,8 @@ create_env_file() {
     # Create .env file
     cat > "$ENV_FILE" << EOF
 # MongoDB Atlas Configuration
-MONGODB_URI=$MONGODB_URI
-MONGO_URI=$MONGODB_URI
+MONGODB_URI="$MONGODB_URI"
+MONGO_URI="$MONGODB_URI"
 DATA_SOURCE=mongodb
 
 # Application Settings
@@ -177,6 +194,8 @@ EOF
 # LOAD OR CREATE .ENV FILE
 # ============================================
 
+MONGO_PROMPTED=0
+
 if [ ! -f "$ENV_FILE" ]; then
     echo -e "${YELLOW}⚠ .env file not found.${NC}"
     
@@ -193,12 +212,39 @@ if [ ! -f "$ENV_FILE" ]; then
     fi
 fi
 
+# Detect unquoted MongoDB placeholders before sourcing .env
+if grep -Eq '^[[:space:]]*(MONGODB_URI|MONGO_URI)=.*(<username>|<password>|<cluster>)' "$ENV_FILE"; then
+    echo ""
+    echo -e "${YELLOW}⚠ MongoDB URI is not configured yet${NC}"
+    echo -e "${YELLOW}Current URI contains placeholders: <username>, <password>, <cluster>${NC}"
+    echo ""
+    read -p "Do you want to configure MongoDB now? (y/n): " -n 1 -r
+    echo ""
+    MONGO_PROMPTED=1
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        create_env_file
+    else
+        echo -e "${YELLOW}⚠ Continuing with current configuration...${NC}"
+        echo -e "${YELLOW}⚠ Note: Application may not work properly without valid MongoDB credentials${NC}"
+        echo -e "${YELLOW}⚠ You can configure it later by editing the .env file${NC}"
+    fi
+fi
+
 # Load environment variables from .env
 echo "📄 Loading environment variables from .env..."
-set -a
-source "$ENV_FILE"
-set +a
-echo -e "${GREEN}✓ Environment variables loaded${NC}"
+if load_env_file; then
+    echo -e "${GREEN}✓ Environment variables loaded${NC}"
+else
+    read -p "Do you want to configure MongoDB now? (y/n): " -n 1 -r
+    echo ""
+    MONGO_PROMPTED=1
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        create_env_file
+        echo -e "${GREEN}✓ Environment variables loaded from updated .env${NC}"
+    else
+        echo -e "${YELLOW}⚠ Continuing without loading .env variables${NC}"
+    fi
+fi
 
 # Check if MongoDB URI needs configuration
 if [ -z "$MONGODB_URI" ] || [[ $MONGODB_URI == *"<username>"* ]] || [[ $MONGODB_URI == *"<password>"* ]] || [[ $MONGODB_URI == *"<cluster>"* ]]; then
@@ -206,14 +252,16 @@ if [ -z "$MONGODB_URI" ] || [[ $MONGODB_URI == *"<username>"* ]] || [[ $MONGODB_
     echo -e "${YELLOW}⚠ MongoDB URI is not configured yet${NC}"
     echo -e "${YELLOW}Current URI contains placeholders: <username>, <password>, <cluster>${NC}"
     echo ""
-    read -p "Do you want to configure MongoDB now? (y/n): " -n 1 -r
-    echo ""
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        create_env_file
-    else
-        echo -e "${YELLOW}⚠ Continuing with current configuration...${NC}"
-        echo -e "${YELLOW}⚠ Note: Application may not work properly without valid MongoDB credentials${NC}"
-        echo -e "${YELLOW}⚠ You can configure it later by editing the .env file${NC}"
+    if [ "$MONGO_PROMPTED" -eq 0 ]; then
+        read -p "Do you want to configure MongoDB now? (y/n): " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            create_env_file
+        else
+            echo -e "${YELLOW}⚠ Continuing with current configuration...${NC}"
+            echo -e "${YELLOW}⚠ Note: Application may not work properly without valid MongoDB credentials${NC}"
+            echo -e "${YELLOW}⚠ You can configure it later by editing the .env file${NC}"
+        fi
     fi
 fi
 
