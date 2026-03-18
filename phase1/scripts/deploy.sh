@@ -21,7 +21,7 @@ NC='\033[0m' # No Color
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_ROOT="$SCRIPT_DIR"
+APP_ROOT="$(cd "$SCRIPT_DIR/../app" && pwd)"
 
 # ============================================
 # SET PRODUCTION MODE
@@ -436,7 +436,7 @@ echo ""
     echo ""
     
     # Create configs directory if doesn't exist
-    CONFIGS_DIR="$SCRIPT_DIR/configs"
+    CONFIGS_DIR="$APP_ROOT/configs"
     if [ ! -d "$CONFIGS_DIR" ]; then
         mkdir -p "$CONFIGS_DIR"
         echo -e "${GREEN}✓ Created configs directory${NC}"

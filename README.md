@@ -123,68 +123,57 @@ MongoDB 6.0+
 
 ### Installation Steps
 
-#### 1. Clone and Navigate
+#### 1. Create EC2 Instance (AWS)
+- Amazon Machine Image: Ubuntu
+- Instance type: t3.micro
+- Enable security group rules:
+  - Allow SSH traffic
+  - Allow HTTP traffic from the internet
+  - Allow HTTPS traffic from the internet
+
+#### 2. Login to Ubuntu Server
+On local Windows machine (open Command Prompt in your SSH key folder):
 ```bash
-cd phase1/app/scripts
+cd C:\Users\DUC HUY\.ssh
+ssh -i key.pem ubuntu@Public_IPv4_address
+```
+When asked for host authenticity, type `yes`.
+
+#### 3. Clone Source Code
+```bash
+git clone https://github.com/Tick2005/DevOps_Midterm.git
 ```
 
-#### 2. Install Dependencies
+#### 4. Navigate to Deploy Script
 ```bash
-npm install
+cd DevOps_Midterm/phase1/scripts
+chmod +x deploy.sh
+./deploy.sh
 ```
 
-This will install:
-- `express` - Web framework
-- `mongoose` - MongoDB ODM
-- `ejs` - Template engine
-- `express-validator` - Input validation
-- `multer` - File upload handling
-- `dotenv` - Environment configuration
-- `uuid` - Unique ID generation
-
-#### 3. Configure Environment
-```bash
-# Copy example environment file
-cp .env.example .env
-
-# Edit .env file
-nano .env
+#### 5. Configure MongoDB Atlas When Prompted
+During script execution:
+```text
+Do you want to configure MongoDB now? (y/n): y
+MongoDB Username: admin
+MongoDB Password: admin
+Cluster Name: cluster0.ahaubn2
+Database Name [productdb]: productdb
+Application Port [3000]: 3000
 ```
 
-**Environment Variables:**
-```env
-# Application Configuration
-PORT=3000                                    # Server port
-HOST=0.0.0.0                                # Server host
-NODE_ENV=development                         # Environment mode
-
-# MongoDB Configuration (Optional)
-MONGO_URI=mongodb://localhost:27017/products_db
-# Or use MongoDB Atlas
-MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/products_db
+#### 6. Verify Atlas Connection
+```bash
+sudo journalctl -u product-app -n 100 | grep -E "Data source in use|Failed to connect|Successfully connected"
 ```
 
-#### 4. Start Application
+Expected result includes:
+- `Successfully connected to MongoDB Atlas`
+- `Data source in use: mongodb`
 
-**Development Mode** (with auto-reload):
+#### 7. Verify Public Access
 ```bash
-npm run dev
-```
-
-**Production Mode**:
-```bash
-npm start
-```
-
-#### 5. Verify Installation
-```bash
-# Check if server is running
-curl http://localhost:3000
-
-# Test API endpoint
-curl http://localhost:3000/products
-
-# Should return: []
+curl http://Public_IPv4_address
 ```
 
 ### Access Points
@@ -259,147 +248,52 @@ sudo apt update
 sudo apt install -y nginx nodejs npm mongodb
 ```
 
-### Deployment Steps
+### Installation Steps
 
-#### 1. Transfer Application Files
+#### 1. Test Nginx Configuration
 ```bash
-# On your local machine
-scp -r phase1/app ubuntu@your-server-ip:/home/ubuntu/DevOps_Midterm/phase1/
-
-# Or clone from Git
-ssh ubuntu@your-server-ip
-git clone <your-repo-url> /home/ubuntu/DevOps_Midterm/
-```
-
-#### 2. Install Application
-```bash
-cd /home/ubuntu/DevOps_Midterm/phase1/app
-npm install --production
-
-# Create .env file
-cp .env.example .env
-nano .env
-```
-
-#### 3. Configure systemd Service
-```bash
-# Copy service file
-sudo cp /home/ubuntu/DevOps_Midterm/phase2/configs/backend.service \
-        /etc/systemd/system/product-app.service
-
-# Edit if needed
-sudo nano /etc/systemd/system/product-app.service
-```
-
-**Service File Content** (`phase2/configs/backend.service`):
-```ini
-[Unit]
-Description=Product Management Node.js Application
-After=network.target
-
-[Service]
-Type=simple
-User=ubuntu
-WorkingDirectory=/home/ubuntu/DevOps_Midterm/phase1/app
-ExecStart=/usr/bin/node /home/ubuntu/DevOps_Midterm/phase1/app/main.js
-
-# Auto restart on failure
-Restart=always
-RestartSec=10
-
-# Environment variables
-Environment=NODE_ENV=production
-Environment=PORT=3000
-EnvironmentFile=/home/ubuntu/DevOps_Midterm/phase1/app/.env
-
-# Logging
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-```
-
-#### 4. Start Application Service
-```bash
-# Reload systemd
-sudo systemctl daemon-reload
-
-# Enable auto-start on boot
-sudo systemctl enable product-app
-
-# Start service
-sudo systemctl start product-app
-
-# Check status
-sudo systemctl status product-app
-
-# View logs
-sudo journalctl -u product-app -f
-```
-
-#### 5. Configure Nginx Reverse Proxy
-```bash
-# Copy nginx configuration
-sudo cp /home/ubuntu/DevOps_Midterm/phase2/configs/nginx.conf \
-        /etc/nginx/sites-available/product-app
-
-# Create symbolic link
-sudo ln -s /etc/nginx/sites-available/product-app \
-            /etc/nginx/sites-enabled/
-
-# Remove default site
-sudo rm /etc/nginx/sites-enabled/default
-
-# Test configuration
 sudo nginx -t
+```
 
-# Restart nginx
+#### 2. Restart Nginx
+```bash
 sudo systemctl restart nginx
 ```
 
-**Nginx Configuration** (`phase2/configs/nginx.conf`):
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;  # Change this!
-
-    client_max_body_size 10M;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # Serve uploaded files directly (better performance)
-    location /uploads/ {
-        alias /home/ubuntu/DevOps_Midterm/phase1/app/public/uploads/;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-}
-```
-
-#### 6. Setup HTTPS with Let's Encrypt (Optional but Recommended)
+#### 3. Update Nginx Domain
 ```bash
-# Install Certbot
+sudo nano /etc/nginx/sites-available/product-app
+```
+Set `server_name` to your real domain:
+```nginx
+server_name your-domain.com www.your-domain.com;
+```
+If your domain ends with `.site`, use that exact domain (example: `your-domain.site`).
+
+Save and exit:
+- `Ctrl + O` (write file)
+- `Ctrl + X` (exit)
+
+#### 4. Install Certbot
+```bash
 sudo apt install -y certbot python3-certbot-nginx
-
-# Obtain SSL certificate
-sudo certbot --nginx -d your-domain.com -d www.your-domain.com
-
-# Test auto-renewal
-sudo certbot renew --dry-run
 ```
 
-Certbot will automatically:
-- ✅ Obtain SSL certificate
-- ✅ Configure Nginx for HTTPS
-- ✅ Set up auto-renewal
+#### 5. Point Domain to EC2 Public IPv4
+In DNS settings, create/update A record so your domain points to `Public_IPv4_address` from AWS.
+
+#### 6. Obtain SSL Certificate
+```bash
+sudo certbot --nginx -d your-domain.com -d www.your-domain.com
+```
+During certbot setup:
+- Enter any valid email address
+- Select `Y` when prompted
+
+#### 7. Verify HTTPS Access
+```bash
+curl https://www.your-domain.com
+```
 
 ### Testing Phase 2
 
