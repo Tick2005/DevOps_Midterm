@@ -185,7 +185,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 echo "Starting services with Docker Compose..."
-docker compose up -d
+docker-compose up -d
 
 echo ""
 echo "Waiting for services to be healthy..."
@@ -210,7 +210,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 echo "Running containers:"
-docker compose ps
+docker-compose ps
 echo ""
 
 echo "Docker volumes:"

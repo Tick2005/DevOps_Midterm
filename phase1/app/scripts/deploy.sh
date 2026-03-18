@@ -149,8 +149,8 @@ create_env_file() {
     # Create .env file
     cat > "$ENV_FILE" << EOF
 # MongoDB Atlas Configuration
-MONGODB_URI=$MONGODB_URI
-MONGO_URI=$MONGODB_URI
+MONGODB_URI="$MONGODB_URI"
+MONGO_URI="$MONGODB_URI"
 DATA_SOURCE=mongodb
 
 # Application Settings
