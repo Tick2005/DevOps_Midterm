@@ -38,51 +38,56 @@ This is a comprehensive DevOps midterm project for the course **502094 - Softwar
 
 ```
 DevOps_Midterm/
-├── README.md                           # Complete documentation (this file)
+├── README.md                              # Complete documentation (this file)
 │
-├── phase1/                             # Phase 1: Local Development
-│   └── app/                            # Application source code
-│       ├── main.js                     # Application entry point
-│       ├── package.json                # Node.js dependencies
-│       ├── deploy.sh                   # Deployment script
-│       ├── .env.example                # Environment variables template
-│       │
-│       ├── config/                     # Configuration files
-│       ├── controllers/                # Request handlers
-│       │   └── productController.js    # Product CRUD operations
-│       ├── models/                     # Data models
-│       │   └── product.js              # Product schema (Mongoose)
-│       ├── routes/                     # API & UI routes
-│       │   ├── productRoutes.js        # REST API routes
-│       │   └── uiRoutes.js             # Frontend routes
-│       ├── services/                   # Business logic
-│       │   └── dataSource.js           # Data source abstraction (MongoDB/Memory)
-│       ├── validators/                 # Input validation
-│       │   └── productValidator.js     # Product validation rules
-│       ├── views/                      # EJS templates
-│       │   ├── index.ejs               # Main UI page
-│       │   └── partials/               # Reusable components
-│       │       ├── head.ejs
-│       │       └── footer.ejs
-│       └── public/                     # Static assets
-│           ├── css/
-│           │   └── styles.css          # Custom styles
-│           ├── js/
-│           │   └── ui.js               # Frontend JavaScript
-│           ├── images/                 # Static images
-│           └── uploads/                # User uploaded images
+├── phase1/                                # Phase 1: Local Development
+│   ├── app/                               # Application source code
+│   │   ├── main.js                        # Application entry point
+│   │   ├── package.json                   # Node.js dependencies
+│   │   ├── package-lock.json
+│   │   ├── .env.example                   # Environment variables template
+│   │   ├── config/                        # Configuration files
+│   │   ├── controllers/                   # Request handlers
+│   │   │   └── productController.js       # Product CRUD operations
+│   │   ├── models/                        # Data models
+│   │   │   └── product.js                 # Product schema (Mongoose)
+│   │   ├── routes/                        # API and UI routes
+│   │   │   ├── productRoutes.js           # REST API routes
+│   │   │   └── uiRoutes.js                # Frontend routes
+│   │   ├── services/                      # Business logic
+│   │   │   └── dataSource.js              # Data source abstraction
+│   │   ├── validators/                    # Input validation
+│   │   │   └── productValidator.js        # Product validation rules
+│   │   ├── views/                         # EJS templates
+│   │   │   ├── index.ejs                  # Main UI page
+│   │   │   └── partials/
+│   │   │       ├── head.ejs
+│   │   │       └── footer.ejs
+│   │   └── public/                        # Static assets
+│   │       ├── css/
+│   │       │   └── styles.css
+│   │       ├── js/
+│   │       │   └── ui.js
+│   │       ├── images/
+│   │       └── uploads/
+│   ├── scripts/
+│   │   └── deploy.sh                      # Phase 1 deployment script
+│   └── evidences/                         # Screenshots and validation evidence
 │
-├── phase2/                             # Phase 2: Production Deployment
-│   └── configs/                        # Configuration files
-│       ├── nginx.conf                  # Nginx reverse proxy configuration
-│       └── backend.service             # systemd service file
+├── phase2/                                # Phase 2: Production Deployment
+│   ├── configs/                           # Configuration files
+│   │   ├── nginx.conf                     # Nginx reverse proxy configuration
+│   │   └── backend.service                # systemd service file
+│   └── evidences/                         # Phase 2 evidence
 │
-└── phase3/                             # Phase 3: Docker Deployment
-    ├── Dockerfile                      # Multi-stage Docker build
-    ├── docker-compose.yml              # Container orchestration
-    ├── nginx.conf                      # Nginx for containers
-    ├── deploy-docker.sh                # Automated deployment script
-    └── .env.example                    # Docker environment variables
+└── phase3/                                # Phase 3: Docker Deployment
+  ├── Dockerfile                         # Multi-stage Docker build
+  ├── docker-compose.yml                 # Container orchestration
+  ├── nginx.conf                         # Nginx for containerized app
+  ├── deploy-docker.sh                   # Automated Docker deployment script
+  ├── .env.example                       # Docker environment variables template
+  ├── .dockerignore
+  └── evidences/                         # Phase 3 evidence
 ```
 
 ---
@@ -343,24 +348,24 @@ Phase 3 implements full containerization with Docker, providing:
 ### Architecture
 ```
 ┌─────────────────────────────────────────┐
-│          Docker Host                    │
+│                Docker Host              │
 │                                         │
-│  ┌────────────────┐  ┌──────────────┐  │
-│  │   Nginx:80     │  │  Web App:3000│  │
-│  │  (optional)    │─▶│  (Node.js)   │  │
-│  └────────────────┘  └───────┬──────┘  │
-│                              │          │
-│                              ▼          │
-│                     ┌──────────────┐   │
-│                     │  MongoDB:    │   │
-│                     │    27017     │   │
-│                     └───────┬──────┘   │
-│                             │          │
-│  ┌──────────────────────────┴────────┐ │
-│  │      Docker Volumes               │ │
-│  │  - mongodb_data                   │ │
-│  │  - uploads_data                   │ │
-│  └───────────────────────────────────┘ │
+│  ┌────────────────┐   ┌──────────────┐  │
+│  │   Nginx:80     │   │  Web App:3000│  │
+│  │  (optional)    │─▶ │  (Node.js)   │  │
+│  └────────────────┘   └───────┬──────┘  │
+│                               │         │
+│                               ▼         │
+│                     ┌──────────────┐    │
+│                     │  MongoDB:    │    │
+│                     │    27017     │    │
+│                     └───────┬──────┘    │
+│                             │           │
+│  ┌──────────────────────────┴────────┐  │
+│  │      Docker Volumes               │  │
+│  │  - mongodb_data                   │  │
+│  │  - uploads_data                   │  │
+│  └───────────────────────────────────┘  │
 └─────────────────────────────────────────┘
 ```
 
